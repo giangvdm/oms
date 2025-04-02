@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 
 export const getUsers = async (req, res) => {
@@ -23,11 +24,12 @@ export const createUser = async (req, res) => {
 		// Check if user already exists
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
-		  	return res.status(400).json({ message: 'User already exists. Please provide a different email address.' });
+			return res.status(400).json({ message: 'User already exists. Please provide a different email address.' });
 		}
 	
 		// Create and save user
-		const user = new User({ name, email, passwordHash: password });
+		const hashedPassword = await bcrypt.hash(password, 10);
+		const user = new User({ name, email, passwordHash: hashedPassword });
 		await user.save();
 	
 		res.status(201).json({ success: true, message: 'User registered successfully', data: user });

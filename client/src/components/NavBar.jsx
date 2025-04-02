@@ -21,14 +21,11 @@ const NavBar = () => {
         </Typography>
 
         <Box>
-          <Button component={RouterLink} to="/" color="inherit">
-            Home
-          </Button>
-          <Button component={RouterLink} to="/saved" color="inherit">
-            Saved
-          </Button>
           <Button component={RouterLink} to="/login" color="inherit">
             Login
+          </Button>
+          <Button component={RouterLink} to="/register" color="inherit">
+            Register
           </Button>
         </Box>
       </Toolbar>

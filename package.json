@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon --legacy-watch server/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "NODE_ENV=development node server/index.js"
+    "start": "NODE_ENV=development node server/index.js",
+    "dev:all": "concurrently \"npm run dev\" \"cd client && npm run dev\""
   },
   "type": "module",
   "keywords": [],
@@ -19,6 +20,7 @@
     "mongoose": "^8.13.1"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "nodemon": "^3.1.9"
   }
 }
