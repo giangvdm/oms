@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  oms-app:
+    image: node:20.19.0
+    volumes:
+      - ./:/app
+    ports:
+      - "5000:5000"
+      - "5173:5173"
+    command: ["sleep", "infinity"]
+    depends_on:
+      - oms-db
+
+  oms-db:
+    image: mongo:latest
+    container_name: oms-db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+volumes:
+  mongo-data:

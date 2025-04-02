@@ -9,8 +9,6 @@ services:
     env_file: ./.env
     ports:
       - "5000:5000"
-    volumes:
-      - ./:/app/
     depends_on:
       - oms-db
 
@@ -20,9 +18,7 @@ services:
       dockerfile: Dockerfile
     container_name: oms-client
     ports:
-      - "3000:3000"
-    volumes:
-      - ./:/app/
+      - "5173:5173"
     depends_on:
       - oms-server
 
