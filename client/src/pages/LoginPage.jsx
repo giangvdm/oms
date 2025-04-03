@@ -1,25 +1,37 @@
-import { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { TextField, Button, Typography, Container, Box } from "@mui/material";
+import React, { useState, useContext } from 'react';
+import { TextField, Button, Container, Typography, Box } from '@mui/material';
+import { AuthContext } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+
+  const [error, setError] = useState('');
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
-      const res = await axios.post("/api/users/login", formData);
-      localStorage.setItem("token", res.data.token);
-      navigate("/");
+      const res = await axios.post('/api/users/login', formData);
+      login(res.data.user); // save user in context
+      navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || 'Login failed');
     }
   };
 
@@ -55,14 +67,8 @@ const LoginPage = () => {
               {error}
             </Typography>
           )}
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            color="primary"
-            sx={{ mt: 3 }}
-          >
-            Login
+          <Button variant="contained" color="primary" type="submit" sx={{ mt: 2 }}>
+            Log In
           </Button>
         </Box>
       </Box>
