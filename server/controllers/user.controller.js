@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 
 export const getUsers = async (req, res) => {
@@ -53,5 +54,25 @@ export const updateUser = async (req, res) => {
 		res.status(200).json({ success: true, data: updatedUser });
 	} catch (error) {
 		res.status(500).json({ success: false, message: "Server Error" });
+	}
+};
+
+export const loginUser = async (req, res) => {
+	const JWT_SECRET = process.env.JWT_SECRET;
+
+	try {
+		const { email, password } = req.body;
+		const user = await User.findOne({ email });
+
+		if (!user) return res.status(400).json({ message: "Invalid credentials" });
+
+		const isMatch = await user.comparePassword(password);
+		if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+	
+		const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
+	
+		res.status(200).json({ token, user: { id: user._id, name: user.name, email: user.email } });
+	} catch (err) {
+		res.status(500).json({ message: "There are problems trying to log you in. Please try again!" });
 	}
 };
