@@ -1,6 +1,4 @@
-// Remove the automatic search triggered by key presses by modifying the SearchComponent.jsx file
-
-import React, { useState, useContext, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { 
   Box, 
   Container, 
@@ -11,7 +9,6 @@ import {
   Card, 
   CardMedia, 
   CardContent,
-  CardActions,
   FormControl,
   InputLabel,
   Select,
@@ -24,7 +21,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert
+  Alert,
+  Tooltip
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -34,204 +32,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import { AuthContext } from '../context/AuthContext';
 import { searchMedia, getSearchHistory, deleteSearch } from '../services/searchService';
-import { debounce } from 'lodash';
 
-// Memoized Media Item Component to prevent unnecessary re-renders
-const MediaItem = memo(({ item, mediaType, handleMediaClick, currentAudio, isPlaying, toggleAudioPlayback }) => {
-  return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {mediaType === 'images' ? (
-        <CardMedia
-          component="img"
-          height="200"
-          image={item.thumbnail || item.url}
-          alt={item.title}
-          sx={{ objectFit: 'cover', cursor: 'pointer' }}
-          onClick={() => handleMediaClick(item)}
-        />
-      ) : (
-        <Box 
-          height="200" 
-          display="flex" 
-          alignItems="center" 
-          justifyContent="center"
-          bgcolor="rgba(0,0,0,0.05)"
-          sx={{ cursor: 'pointer' }}
-          onClick={() => handleMediaClick(item)}
-        >
-          <IconButton
-            size="large"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleAudioPlayback(item);
-            }}
-          >
-            {currentAudio && currentAudio.id === item.id && isPlaying ? (
-              <PauseIcon fontSize="large" />
-            ) : (
-              <PlayArrowIcon fontSize="large" />
-            )}
-          </IconButton>
-          <Typography variant="body2" color="text.secondary" align="center">
-            {item.duration ? `${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}` : 'Audio'}
-          </Typography>
-        </Box>
-      )}
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography variant="subtitle1" noWrap>
-          {item.title || 'Untitled'}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" noWrap>
-          By {item.creator || 'Unknown'}
-        </Typography>
-        <Box mt={1}>
-          <Chip 
-            label={item.license || 'Unknown License'} 
-            size="small" 
-            sx={{ mr: 0.5, mb: 0.5 }}
-          />
-        </Box>
-      </CardContent>
-    </Card>
-  );
-});
-
-// Memoized Filter Section to prevent re-renders when other state changes
-const FilterSection = memo(({ filters, handleFilterChange, showFilters }) => {
-  if (!showFilters) return null;
-  
-  return (
-    <Box mt={2} p={2} border="1px solid #e0e0e0" borderRadius={1}>
-      <Typography variant="h6" gutterBottom>Advanced Filters</Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            label="Creator"
-            name="creator"
-            value={filters.creator}
-            onChange={handleFilterChange}
-            variant="outlined"
-            size="small"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            label="Title contains"
-            name="title"
-            value={filters.title}
-            onChange={handleFilterChange}
-            variant="outlined"
-            size="small"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            label="Tags"
-            name="tags"
-            value={filters.tags}
-            onChange={handleFilterChange}
-            variant="outlined"
-            size="small"
-            helperText="Comma-separated values"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <FormControl fullWidth size="small">
-            <InputLabel>License</InputLabel>
-            <Select
-              name="license"
-              value={filters.license}
-              label="License"
-              onChange={handleFilterChange}
-            >
-              <MenuItem value="">Any</MenuItem>
-              <MenuItem value="CC0">CC0</MenuItem>
-              <MenuItem value="CC-BY">CC-BY</MenuItem>
-              <MenuItem value="CC-BY-SA">CC-BY-SA</MenuItem>
-              <MenuItem value="CC-BY-ND">CC-BY-ND</MenuItem>
-              <MenuItem value="CC-BY-NC">CC-BY-NC</MenuItem>
-              <MenuItem value="CC-BY-NC-SA">CC-BY-NC-SA</MenuItem>
-              <MenuItem value="CC-BY-NC-ND">CC-BY-NC-ND</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-});
-
-// Memoized SearchResults Component
-const SearchResults = memo(({ 
-  results, 
-  loading, 
-  query, 
-  mediaType, 
-  totalPages, 
-  page, 
-  handlePageChange, 
-  handleMediaClick, 
-  currentAudio, 
-  isPlaying, 
-  toggleAudioPlayback 
-}) => {
-  if (loading) {
-    return (
-      <Box textAlign="center" py={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-  
-  if (results.length === 0) {
-    if (query !== '') {
-      return (
-        <Typography variant="body1" textAlign="center" py={4}>
-          No results found. Try different search terms or filters.
-        </Typography>
-      );
-    }
-    return null;
-  }
-  
-  return (
-    <>
-      <Typography variant="h6" gutterBottom>
-        Search Results
-      </Typography>
-      <Grid container spacing={3}>
-        {results.map((item) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-            <MediaItem 
-              item={item} 
-              mediaType={mediaType}
-              handleMediaClick={handleMediaClick}
-              currentAudio={currentAudio}
-              isPlaying={isPlaying}
-              toggleAudioPlayback={toggleAudioPlayback}
-            />
-          </Grid>
-        ))}
-      </Grid>
-      
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box display="flex" justifyContent="center" mt={4}>
-          <Pagination 
-            count={totalPages} 
-            page={page} 
-            onChange={handlePageChange} 
-            color="primary" 
-          />
-        </Box>
-      )}
-    </>
-  );
-});
-
-// Main SearchComponent with optimizations
 const SearchComponent = () => {
   // State for search
   const [query, setQuery] = useState('');
@@ -241,6 +42,7 @@ const SearchComponent = () => {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [itemsPerPage] = useState(20); // Fixed items per page
   
   // State for filters
   const [showFilters, setShowFilters] = useState(false);
@@ -265,6 +67,9 @@ const SearchComponent = () => {
   // State for media details
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [showMediaDetails, setShowMediaDetails] = useState(false);
+  
+  // State to track current search parameters
+  const [currentSearchParams, setCurrentSearchParams] = useState(null);
   
   const { user } = useContext(AuthContext);
   
@@ -305,10 +110,9 @@ const SearchComponent = () => {
     }
   }, [user]);
   
-  const handleSearch = useCallback(async (e) => {
-    e?.preventDefault();
-    
-    if (!query.trim()) {
+  // Function to perform the search with current parameters
+  const performSearch = useCallback(async (searchParams) => {
+    if (!searchParams || !searchParams.query.trim()) {
       setError('Please enter a search term');
       return;
     }
@@ -317,15 +121,15 @@ const SearchComponent = () => {
       setLoading(true);
       setError('');
       
-      const response = await searchMedia(query, {
-        mediaType,
-        page,
-        pageSize: 20,
-        ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
+      const response = await searchMedia(searchParams.query, {
+        mediaType: searchParams.mediaType,
+        page: searchParams.page,
+        pageSize: searchParams.itemsPerPage,
+        ...Object.fromEntries(Object.entries(searchParams.filters).filter(([_, v]) => v !== ''))
       });
       
       setResults(response.data.results);
-      setTotalPages(Math.ceil(response.data.count / 20));
+      setTotalPages(response.data.page_count || 0);
       setLoading(false);
       
       // Refresh search history if user is logged in
@@ -337,9 +141,49 @@ const SearchComponent = () => {
       setError('An error occurred while searching');
       setLoading(false);
     }
-  }, [query, mediaType, filters, page, user, loadSearchHistory]);
+  }, [user, loadSearchHistory]);
   
-  // Update filters without debouncing or triggering search
+  // Handle initial search
+  const handleSearch = useCallback((e) => {
+    e?.preventDefault();
+    
+    // Reset to first page when starting a new search
+    setPage(1);
+    
+    // Save current search parameters
+    const searchParams = {
+      query,
+      mediaType,
+      filters,
+      page: 1, // Always start on first page for a new search
+      itemsPerPage
+    };
+    
+    setCurrentSearchParams(searchParams);
+    performSearch(searchParams);
+    
+    // Scroll to top when starting a new search
+    window.scrollTo(0, 0);
+  }, [query, mediaType, filters, itemsPerPage, performSearch]);
+  
+  // Handle page change
+  const handlePageChange = useCallback((event, newPage) => {
+    setPage(newPage);
+    
+    // Update search parameters with new page
+    const updatedParams = {
+      ...currentSearchParams,
+      page: newPage
+    };
+    
+    setCurrentSearchParams(updatedParams);
+    performSearch(updatedParams);
+    
+    // Scroll to top when changing pages
+    window.scrollTo(0, 0);
+  }, [currentSearchParams, performSearch]);
+  
+  // Update filters
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -347,38 +191,6 @@ const SearchComponent = () => {
       [name]: value
     }));
   }, []);
-  
-  const handlePageChange = useCallback((event, value) => {
-    setPage(value);
-    window.scrollTo(0, 0);
-    
-    // Explicitly trigger a new search when page changes
-    const doPageSearch = async () => {
-      if (!query.trim()) return;
-      
-      try {
-        setLoading(true);
-        setError('');
-        
-        const response = await searchMedia(query, {
-          mediaType,
-          page: value, // Use the new page value
-          pageSize: 20,
-          ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
-        });
-        
-        setResults(response.data.results);
-        setTotalPages(Math.ceil(response.data.count / 20));
-        setLoading(false);
-      } catch (err) {
-        console.error('Search error:', err);
-        setError('An error occurred while searching');
-        setLoading(false);
-      }
-    };
-    
-    doPageSearch();
-  }, [query, mediaType, filters]);
   
   const handleDeleteSearch = useCallback(async (id) => {
     try {
@@ -390,6 +202,7 @@ const SearchComponent = () => {
   }, [loadSearchHistory]);
   
   const handleHistoryItemClick = useCallback((historyItem) => {
+    // Set search parameters from history
     setQuery(historyItem.query);
     setMediaType(historyItem.mediaType);
     
@@ -404,10 +217,11 @@ const SearchComponent = () => {
       });
     }
     
+    // Reset to page 1
+    setPage(1);
     setShowHistory(false);
-    setPage(1); // Reset to first page
     
-    // Don't automatically search here - require the user to click the search button
+    // Search will be triggered by the user clicking the search button
   }, []);
   
   const handleMediaClick = useCallback((media) => {
@@ -424,9 +238,282 @@ const SearchComponent = () => {
     }
   }, [currentAudio, isPlaying]);
   
-  // Memoize the search history dialog to prevent re-renders
-  const SearchHistoryDialog = useMemo(() => {
-    return (
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Audio player */}
+      {currentAudio && (
+        <audio
+          ref={audioRef}
+          src={currentAudio.url}
+          onEnded={handleAudioEnd}
+          style={{ display: 'none' }}
+        />
+      )}
+      
+      {/* Search header */}
+      <Box textAlign="center" mb={4}>
+        <Typography variant="h4" gutterBottom>
+          Open Media Search
+        </Typography>
+        <Typography variant="body1" color="text.secondary" gutterBottom>
+          Search for open-licensed {mediaType === 'images' ? 'images' : 'audio files'} from Openverse
+        </Typography>
+      </Box>
+      
+      {/* Search form */}
+      <Box component="form" onSubmit={handleSearch} mb={4}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={7}>
+            <TextField
+              fullWidth
+              label="Search media"
+              variant="outlined"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <FormControl fullWidth>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={mediaType}
+                label="Type"
+                onChange={(e) => setMediaType(e.target.value)}
+              >
+                <MenuItem value="images">Images</MenuItem>
+                <MenuItem value="audio">Audio</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Box display="flex" gap={1}>
+              <Button 
+                variant="contained" 
+                type="submit" 
+                fullWidth
+                startIcon={<SearchIcon />}
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Search'}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setShowFilters(!showFilters)}
+                startIcon={<FilterListIcon />}
+              >
+                Filters
+              </Button>
+              {user && (
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    loadSearchHistory();
+                    setShowHistory(true);
+                  }}
+                  startIcon={<HistoryIcon />}
+                >
+                  History
+                </Button>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+        
+        {/* Filters */}
+        {showFilters && (
+          <Box mt={2} p={2} border="1px solid #e0e0e0" borderRadius={1}>
+            <Typography variant="h6" gutterBottom>Advanced Filters</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="Creator"
+                  name="creator"
+                  value={filters.creator}
+                  onChange={handleFilterChange}
+                  variant="outlined"
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="Title contains"
+                  name="title"
+                  value={filters.title}
+                  onChange={handleFilterChange}
+                  variant="outlined"
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="Tags"
+                  name="tags"
+                  value={filters.tags}
+                  onChange={handleFilterChange}
+                  variant="outlined"
+                  size="small"
+                  helperText="Comma-separated values"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>License</InputLabel>
+                  <Select
+                    name="license"
+                    value={filters.license}
+                    label="License"
+                    onChange={handleFilterChange}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="CC0">CC0</MenuItem>
+                    <MenuItem value="CC-BY">CC-BY</MenuItem>
+                    <MenuItem value="CC-BY-SA">CC-BY-SA</MenuItem>
+                    <MenuItem value="CC-BY-ND">CC-BY-ND</MenuItem>
+                    <MenuItem value="CC-BY-NC">CC-BY-NC</MenuItem>
+                    <MenuItem value="CC-BY-NC-SA">CC-BY-NC-SA</MenuItem>
+                    <MenuItem value="CC-BY-NC-ND">CC-BY-NC-ND</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+      </Box>
+      
+      {/* Error message */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {/* Search results */}
+      <Box mb={4}>
+        {loading ? (
+          <Box textAlign="center" py={4}>
+            <CircularProgress />
+          </Box>
+        ) : results.length > 0 ? (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Search Results {totalPages > 0 && `(Page ${page} of ${totalPages})`}
+            </Typography>
+            <Grid container spacing={3}>
+              {results.map((item) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {mediaType === 'images' ? (
+                      <CardMedia
+                        component="img"
+                        height="200"
+                        image={item.thumbnail || item.url}
+                        alt={item.title}
+                        sx={{ objectFit: 'cover', cursor: 'pointer' }}
+                        onClick={() => handleMediaClick(item)}
+                      />
+                    ) : (
+                      <Box 
+                        height="200" 
+                        display="flex" 
+                        alignItems="center" 
+                        justifyContent="center"
+                        bgcolor="rgba(0,0,0,0.05)"
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => handleMediaClick(item)}
+                      >
+                        <IconButton
+                          size="large"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAudioPlayback(item);
+                          }}
+                        >
+                          {currentAudio && currentAudio.id === item.id && isPlaying ? (
+                            <PauseIcon fontSize="large" />
+                          ) : (
+                            <PlayArrowIcon fontSize="large" />
+                          )}
+                        </IconButton>
+                        <Typography variant="body2" color="text.secondary" align="center">
+                          {item.duration ? `${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}` : 'Audio'}
+                        </Typography>
+                      </Box>
+                    )}
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="subtitle1" noWrap>
+                        {item.title || 'Untitled'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        By {item.creator || 'Unknown'}
+                      </Typography>
+                      <Box mt={1}>
+                        <Chip 
+                          label={item.license || 'Unknown License'} 
+                          size="small" 
+                          sx={{ mr: 0.5, mb: 0.5 }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Box display="flex" flexDirection="column" alignItems="center" mt={4}>
+                <Box mb={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing page {page} of {totalPages}
+                  </Typography>
+                </Box>
+                <Pagination 
+                  count={totalPages} 
+                  page={page} 
+                  onChange={handlePageChange} 
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                  siblingCount={1}
+                  boundaryCount={1}
+                />
+                <Box mt={2} display="flex" gap={1} alignItems="center">
+                  <Tooltip title="Jump to page">
+                    <TextField
+                      size="small"
+                      label="Go to page"
+                      type="number"
+                      InputProps={{ inputProps: { min: 1, max: totalPages } }}
+                      sx={{ width: '100px' }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const targetPage = parseInt(e.target.value);
+                          if (targetPage >= 1 && targetPage <= totalPages) {
+                            handlePageChange(null, targetPage);
+                          }
+                        }
+                      }}
+                    />
+                  </Tooltip>
+                  <Typography variant="body2" color="text.secondary">
+                    {itemsPerPage} results per page
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </>
+        ) : query !== '' && (
+          <Typography variant="body1" textAlign="center" py={4}>
+            No results found. Try different search terms or filters.
+          </Typography>
+        )}
+      </Box>
+      
+      {/* Search History Dialog */}
       <Dialog
         open={showHistory}
         onClose={() => setShowHistory(false)}
@@ -485,12 +572,8 @@ const SearchComponent = () => {
           <Button onClick={() => setShowHistory(false)}>Close</Button>
         </DialogActions>
       </Dialog>
-    );
-  }, [showHistory, historyLoading, searchHistory, handleHistoryItemClick, handleDeleteSearch]);
-  
-  // Memoize the media details dialog
-  const MediaDetailsDialog = useMemo(() => {
-    return (
+      
+      {/* Media Details Dialog */}
       <Dialog
         open={showMediaDetails}
         onClose={() => setShowMediaDetails(false)}
@@ -591,127 +674,6 @@ const SearchComponent = () => {
           </>
         )}
       </Dialog>
-    );
-  }, [showMediaDetails, selectedMedia, mediaType, toggleAudioPlayback, currentAudio, isPlaying]);
-  
-  return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Audio player */}
-      {currentAudio && (
-        <audio
-          ref={audioRef}
-          src={currentAudio.url}
-          onEnded={handleAudioEnd}
-          style={{ display: 'none' }}
-        />
-      )}
-      
-      {/* Search header */}
-      <Box textAlign="center" mb={4}>
-        <Typography variant="h4" gutterBottom>
-          Open Media Search
-        </Typography>
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          Search for open-licensed {mediaType === 'images' ? 'images' : 'audio files'} from Openverse
-        </Typography>
-      </Box>
-      
-      {/* Search form */}
-      <Box component="form" onSubmit={handleSearch} mb={4}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={7}>
-            <TextField
-              fullWidth
-              label="Search media"
-              variant="outlined"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={2}>
-            <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={mediaType}
-                label="Type"
-                onChange={(e) => setMediaType(e.target.value)}
-              >
-                <MenuItem value="images">Images</MenuItem>
-                <MenuItem value="audio">Audio</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Box display="flex" gap={1}>
-              <Button 
-                variant="contained" 
-                type="submit" 
-                fullWidth
-                startIcon={<SearchIcon />}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Search'}
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => setShowFilters(!showFilters)}
-                startIcon={<FilterListIcon />}
-              >
-                Filters
-              </Button>
-              {user && (
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    loadSearchHistory();
-                    setShowHistory(true);
-                  }}
-                  startIcon={<HistoryIcon />}
-                >
-                  History
-                </Button>
-              )}
-            </Box>
-          </Grid>
-        </Grid>
-        
-        {/* Filters - Memoized component */}
-        <FilterSection 
-          showFilters={showFilters} 
-          filters={filters} 
-          handleFilterChange={handleFilterChange} 
-        />
-      </Box>
-      
-      {/* Error message */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      
-      {/* Search results - Memoized component */}
-      <Box mb={4}>
-        <SearchResults 
-          results={results}
-          loading={loading}
-          query={query}
-          mediaType={mediaType}
-          totalPages={totalPages}
-          page={page}
-          handlePageChange={handlePageChange}
-          handleMediaClick={handleMediaClick}
-          currentAudio={currentAudio}
-          isPlaying={isPlaying}
-          toggleAudioPlayback={toggleAudioPlayback}
-        />
-      </Box>
-      
-      {/* Search History Dialog - Memoized */}
-      {SearchHistoryDialog}
-      
-      {/* Media Details Dialog - Memoized */}
-      {MediaDetailsDialog}
     </Container>
   );
 };
