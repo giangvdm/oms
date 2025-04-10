@@ -1,3 +1,5 @@
+// Remove the automatic search triggered by key presses by modifying the SearchComponent.jsx file
+
 import React, { useState, useContext, useEffect, useCallback, useMemo, memo } from 'react';
 import { 
   Box, 
@@ -233,7 +235,6 @@ const SearchResults = memo(({
 const SearchComponent = () => {
   // State for search
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [mediaType, setMediaType] = useState('images');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -266,17 +267,6 @@ const SearchComponent = () => {
   const [showMediaDetails, setShowMediaDetails] = useState(false);
   
   const { user } = useContext(AuthContext);
-  
-  // Setup debounced query input to prevent excessive state updates while typing
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 300);
-    
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [query]);
   
   // Load search history when component mounts
   useEffect(() => {
@@ -318,7 +308,7 @@ const SearchComponent = () => {
   const handleSearch = useCallback(async (e) => {
     e?.preventDefault();
     
-    if (!debouncedQuery.trim()) {
+    if (!query.trim()) {
       setError('Please enter a search term');
       return;
     }
@@ -327,7 +317,7 @@ const SearchComponent = () => {
       setLoading(true);
       setError('');
       
-      const response = await searchMedia(debouncedQuery, {
+      const response = await searchMedia(query, {
         mediaType,
         page,
         pageSize: 20,
@@ -347,58 +337,48 @@ const SearchComponent = () => {
       setError('An error occurred while searching');
       setLoading(false);
     }
-  }, [debouncedQuery, mediaType, filters, page, user, loadSearchHistory]);
+  }, [query, mediaType, filters, page, user, loadSearchHistory]);
   
-  // Debounced filter change handler to prevent excessive updates
-  const debouncedFilterChange = useCallback(
-    debounce((name, value) => {
-      setFilters(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }, 300),
-    []
-  );
-  
+  // Update filters without debouncing or triggering search
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
-    debouncedFilterChange(name, value);
-  }, [debouncedFilterChange]);
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }, []);
   
   const handlePageChange = useCallback((event, value) => {
     setPage(value);
     window.scrollTo(0, 0);
-    // We'll handle the search in the useEffect that watches for page changes
-  }, []);
-  
-  // Execute search when page changes
-  useEffect(() => {
-    if (debouncedQuery.trim()) {
-      const doSearch = async () => {
-        try {
-          setLoading(true);
-          setError('');
-          
-          const response = await searchMedia(debouncedQuery, {
-            mediaType,
-            page,
-            pageSize: 20,
-            ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
-          });
-          
-          setResults(response.data.results);
-          setTotalPages(Math.ceil(response.data.count / 20));
-          setLoading(false);
-        } catch (err) {
-          console.error('Search error:', err);
-          setError('An error occurred while searching');
-          setLoading(false);
-        }
-      };
+    
+    // Explicitly trigger a new search when page changes
+    const doPageSearch = async () => {
+      if (!query.trim()) return;
       
-      doSearch();
-    }
-  }, [page, debouncedQuery, mediaType, filters]);
+      try {
+        setLoading(true);
+        setError('');
+        
+        const response = await searchMedia(query, {
+          mediaType,
+          page: value, // Use the new page value
+          pageSize: 20,
+          ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
+        });
+        
+        setResults(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 20));
+        setLoading(false);
+      } catch (err) {
+        console.error('Search error:', err);
+        setError('An error occurred while searching');
+        setLoading(false);
+      }
+    };
+    
+    doPageSearch();
+  }, [query, mediaType, filters]);
   
   const handleDeleteSearch = useCallback(async (id) => {
     try {
@@ -426,6 +406,8 @@ const SearchComponent = () => {
     
     setShowHistory(false);
     setPage(1); // Reset to first page
+    
+    // Don't automatically search here - require the user to click the search button
   }, []);
   
   const handleMediaClick = useCallback((media) => {
