@@ -6,9 +6,6 @@ import {
   Box,
   Paper,
   Grid,
-  Card,
-  CardMedia,
-  CardContent,
   Button,
   Chip,
   Divider,
@@ -122,14 +119,6 @@ const MediaDetailsPage = () => {
         </Link>
         <Typography color="text.primary">{mediaDetails.title || 'Details'}</Typography>
       </Breadcrumbs>
-      
-      <Button 
-        startIcon={<ArrowBackIcon />} 
-        onClick={() => navigate(-1)}
-        sx={{ mb: 3 }}
-      >
-        Back
-      </Button>
       
       <Paper elevation={1} sx={{ overflow: 'hidden' }}>
         <Grid container>
