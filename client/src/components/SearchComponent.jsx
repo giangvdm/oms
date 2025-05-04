@@ -30,6 +30,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
+import LaunchIcon from '@mui/icons-material/Launch';
 import { AuthContext } from '../context/AuthContext';
 import { searchMedia, getSearchHistory, deleteSearch } from '../services/searchService';
 
@@ -589,8 +590,30 @@ const SearchComponent = () => {
             </Typography>
           )}
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={() => setShowHistory(false)}>Close</Button>
+          {selectedMedia && (
+            <Button 
+              component="a" 
+              href={`/media/${mediaType}/${selectedMedia.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              startIcon={<LaunchIcon />}
+            >
+              View Full Details
+            </Button>
+          )}
+          {selectedMedia && (
+            <Button 
+              component="a" 
+              href={selectedMedia.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              Download
+            </Button>
+          )}
+          <Button onClick={() => setShowMediaDetails(false)}>Close</Button>
         </DialogActions>
       </Dialog>
       
@@ -687,9 +710,27 @@ const SearchComponent = () => {
               </Grid>
             </DialogContent>
             <DialogActions>
-              <Button component="a" href={selectedMedia.url} target="_blank" rel="noopener noreferrer">
-                Download
-              </Button>
+              {selectedMedia && (
+                <Button 
+                  component="a" 
+                  href={`/media/${mediaType}/${selectedMedia.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  startIcon={<LaunchIcon />}
+                >
+                  View Full Details
+                </Button>
+              )}
+              {selectedMedia && (
+                <Button 
+                  component="a" 
+                  href={selectedMedia.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  Download
+                </Button>
+              )}
               <Button onClick={() => setShowMediaDetails(false)}>Close</Button>
             </DialogActions>
           </>
