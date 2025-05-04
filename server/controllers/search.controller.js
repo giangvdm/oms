@@ -1,22 +1,29 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import Search from '../models/search.model.js';
+import { LRUCache } from '../utils/lruCache.js';
 
 dotenv.config();
 
 // Openverse API base URL
 const OPENVERSE_API_BASE_URL = "https://api.openverse.org/v1";
 
-// Openverse API credentials (optional for many endpoints)
+// Openverse API credentials
 const OPENVERSE_CLIENT_ID = process.env.OPENVERSE_CLIENT_ID;
 const OPENVERSE_CLIENT_SECRET = process.env.OPENVERSE_CLIENT_SECRET;
+
+// Cache for API results (LRU = Least Recently Used)
+// Create a cache with max 1000 items and 10 minute expiry
+const apiCache = new LRUCache(1000, 10 * 60 * 1000);
 
 // Token management
 let accessToken = null;
 let tokenExpiry = null;
+let tokenAcquisitionInProgress = false;
+let tokenAcquisitionQueue = [];
 
 /**
- * Get a valid access token for Openverse API (optional for many endpoints)
+ * Get a valid access token for Openverse API with concurrency control
  */
 const getAccessToken = async () => {
   // If credentials aren't set, return null (will use unauthenticated access)
@@ -30,6 +37,16 @@ const getAccessToken = async () => {
   if (accessToken && tokenExpiry && tokenExpiry > now) {
     return accessToken;
   }
+  
+  // If token acquisition is already in progress, wait for it to complete
+  if (tokenAcquisitionInProgress) {
+    return new Promise((resolve, reject) => {
+      tokenAcquisitionQueue.push({ resolve, reject });
+    });
+  }
+  
+  // Set flag to indicate token acquisition is in progress
+  tokenAcquisitionInProgress = true;
 
   try {
     console.log('Getting new Openverse API access token...');
@@ -43,19 +60,57 @@ const getAccessToken = async () => {
     const response = await axios.post(`${OPENVERSE_API_BASE_URL}/auth_tokens/token/`, formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      }
+      },
+      timeout: 10000 // 10 second timeout
     });
 
     accessToken = response.data.access_token;
-    tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+    // Expire token 5 minutes before actual expiry to ensure we refresh it early
+    tokenExpiry = Date.now() + ((response.data.expires_in - 300) * 1000);
     
     console.log('Successfully obtained Openverse API access token');
+    
+    // Resolve any pending promises
+    tokenAcquisitionQueue.forEach(({ resolve }) => resolve(accessToken));
+    tokenAcquisitionQueue = [];
+    
     return accessToken;
   } catch (error) {
     console.error('Error getting access token:', error.response?.data || error.message);
-    console.log('Will attempt to use Openverse API without authentication');
+    
+    // Reject any pending promises
+    tokenAcquisitionQueue.forEach(({ reject }) => reject(error));
+    tokenAcquisitionQueue = [];
+    
     return null;
+  } finally {
+    // Reset flag
+    tokenAcquisitionInProgress = false;
   }
+};
+
+/**
+ * Retry a function with exponential backoff
+ */
+const retry = async (fn, retries = 3, delay = 1000) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries <= 0) {
+      throw error;
+    }
+    
+    console.log(`Retrying after ${delay}ms, ${retries} retries left`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retry(fn, retries - 1, delay * 2);
+  }
+};
+
+/**
+ * Generate cache key for search parameters
+ */
+const generateCacheKey = (params) => {
+  return `${params.mediaType || 'images'}:${params.query}:${params.page || 1}:${params.pageSize || 20}:${JSON.stringify(params.filters || {})}`;
 };
 
 /**
@@ -69,34 +124,82 @@ export const searchMedia = async (req, res) => {
     if (!query) {
       return res.status(400).json({ success: false, message: 'Search query is required' });
     }
-
-    // For quick testing, skip authentication
-    // You can re-enable this later if needed
-    // const token = await getAccessToken();
     
-    // Make request to Openverse API without authentication
-    const endpoint = `${OPENVERSE_API_BASE_URL}/${mediaType === 'audio' ? 'audio' : 'images'}/`;
+    // Generate cache key
+    const cacheKey = generateCacheKey(req.query);
     
-    console.log(`Searching ${mediaType} with query "${query}" on page ${page}`);
-    
-    const response = await axios.get(endpoint, {
-      params: {
-        q: query,
-        page,
-        page_size: pageSize,
-        ...formatFilters(filters, mediaType)
+    // Check cache
+    const cachedResult = apiCache.get(cacheKey);
+    if (cachedResult) {
+      console.log('Returning cached search results');
+      
+      // If user is logged in, still save search to history
+      if (userId) {
+        try {
+          await Search.create({
+            userId,
+            query,
+            mediaType,
+            filters: { ...filters, page, pageSize },
+            timestamp: new Date()
+          });
+        } catch (historyError) {
+          console.error('Error saving search to history:', historyError);
+          // Continue processing even if history saving fails
+        }
       }
+      
+      return res.status(200).json({
+        success: true,
+        data: cachedResult,
+        fromCache: true
+      });
+    }
+
+    // Get token (may be null if credentials not set)
+    const token = await getAccessToken();
+
+    // Prepare headers - include Authorization header only if token exists
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Make request to Openverse API with retry logic
+    const response = await retry(async () => {
+      console.log(`Searching ${mediaType} with query "${query}" on page ${page}`);
+      
+      const endpoint = `${OPENVERSE_API_BASE_URL}/${mediaType === 'audio' ? 'audio' : 'images'}/`;
+      
+      return axios.get(endpoint, {
+        headers,
+        params: {
+          q: query,
+          page,
+          page_size: pageSize,
+          ...formatFilters(filters, mediaType)
+        },
+        timeout: 15000 // 15 second timeout
+      });
     });
+
+    // Cache successful results
+    apiCache.set(cacheKey, response.data);
 
     // If user is logged in, save search to history
     if (userId) {
-      await Search.create({
-        userId,
-        query,
-        mediaType,
-        filters: { ...filters, page, pageSize },
-        timestamp: new Date()
-      });
+      try {
+        await Search.create({
+          userId,
+          query,
+          mediaType,
+          filters: { ...filters, page, pageSize },
+          timestamp: new Date()
+        });
+      } catch (historyError) {
+        console.error('Error saving search to history:', historyError);
+        // Continue processing even if history saving fails
+      }
     }
 
     res.status(200).json({
@@ -124,6 +227,20 @@ export const getMediaDetails = async (req, res) => {
     if (!id) {
       return res.status(400).json({ success: false, message: 'Media ID is required' });
     }
+    
+    // Generate cache key for details
+    const cacheKey = `details:${mediaType}:${id}`;
+    
+    // Check cache
+    const cachedResult = apiCache.get(cacheKey);
+    if (cachedResult) {
+      console.log('Returning cached media details');
+      return res.status(200).json({
+        success: true,
+        data: cachedResult,
+        fromCache: true
+      });
+    }
 
     // Get access token (may be null if credentials not set)
     const token = await getAccessToken();
@@ -137,7 +254,15 @@ export const getMediaDetails = async (req, res) => {
     // Make request to Openverse API
     const endpoint = `${OPENVERSE_API_BASE_URL}/${mediaType === 'audio' ? 'audio' : 'images'}/${id}/`;
     
-    const response = await axios.get(endpoint, { headers });
+    const response = await retry(async () => {
+      return axios.get(endpoint, { 
+        headers,
+        timeout: 10000 // 10 second timeout
+      });
+    });
+    
+    // Cache successful results
+    apiCache.set(cacheKey, response.data);
 
     res.status(200).json({
       success: true,
