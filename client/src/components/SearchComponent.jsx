@@ -228,6 +228,27 @@ const SearchComponent = () => {
     setSelectedMedia(media);
     setShowMediaDetails(true);
   }, []);
+
+  const handleMediaTypeChange = (e) => {
+    const newMediaType = e.target.value;
+    setMediaType(newMediaType);
+    
+    // If there's an existing query, perform search with the new media type
+    if (query.trim()) {
+      // Create updated search parameters
+      const searchParams = {
+        query,
+        mediaType: newMediaType,
+        filters,
+        page: 1, // Reset to first page when switching media types
+        itemsPerPage
+      };
+      
+      setCurrentSearchParams(searchParams);
+      setPage(1); // Reset page
+      performSearch(searchParams);
+    }
+  };
   
   const toggleAudioPlayback = useCallback((audio) => {
     if (currentAudio && currentAudio.id === audio.id) {
@@ -278,7 +299,7 @@ const SearchComponent = () => {
               <Select
                 value={mediaType}
                 label="Type"
-                onChange={(e) => setMediaType(e.target.value)}
+                onChange={handleMediaTypeChange}
               >
                 <MenuItem value="images">Images</MenuItem>
                 <MenuItem value="audio">Audio</MenuItem>
