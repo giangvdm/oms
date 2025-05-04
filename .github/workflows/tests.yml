@@ -40,7 +40,7 @@ jobs:
       
     - name: Install client dependencies
       working-directory: ./client
-      run: npm ci
+      run: npm ci --legacy-peer-dep
     
     - name: Run backend tests
       run: npm test

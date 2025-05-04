@@ -169,4 +169,125 @@ describe('SearchComponent', () => {
       expect(screen.getByText(/music/i)).toBeInTheDocument();
     });
   });
+
+  test('filters are shown and hidden correctly', () => {
+    renderComponent();
+    
+    // Filters should be hidden initially
+    expect(screen.queryByText(/Advanced Filters/i)).not.toBeInTheDocument();
+    
+    // Click filters button
+    fireEvent.click(screen.getByRole('button', { name: /Filters/i }));
+    
+    // Filters should now be visible
+    expect(screen.getByText(/Advanced Filters/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/License/i)).toBeInTheDocument();
+    
+    // Click filters button again
+    fireEvent.click(screen.getByRole('button', { name: /Filters/i }));
+    
+    // Filters should be hidden again
+    expect(screen.queryByText(/Advanced Filters/i)).not.toBeInTheDocument();
+  });
+  
+  test('changing media type updates search', async () => {
+    searchService.searchMedia.mockResolvedValue({
+      data: { results: [], count: 0 }
+    });
+    
+    renderComponent();
+    
+    // Enter search query first
+    fireEvent.change(screen.getByLabelText(/Search media/i), { target: { value: 'music' } });
+    
+    // Submit search
+    fireEvent.click(screen.getByRole('button', { name: /Search/i }));
+    
+    // Media type should be 'images' by default
+    expect(searchService.searchMedia).toHaveBeenCalledWith('music', expect.objectContaining({
+      mediaType: 'images'
+    }));
+    
+    // Change media type to 'audio'
+    fireEvent.mouseDown(screen.getByLabelText(/Type/i));
+    fireEvent.click(screen.getByText(/Audio/i));
+    
+    // Check if search was performed with new media type
+    await waitFor(() => {
+      expect(searchService.searchMedia).toHaveBeenCalledWith('music', expect.objectContaining({
+        mediaType: 'audio'
+      }));
+    });
+  });
+  
+  test('handles pagination correctly', async () => {
+    // Mock search results with multiple pages
+    searchService.searchMedia.mockResolvedValue({
+      data: {
+        results: [{ id: 'test-1', title: 'Test 1', creator: 'Creator 1' }],
+        count: 40,
+        page_count: 2
+      }
+    });
+    
+    renderComponent();
+    
+    // Enter search query
+    fireEvent.change(screen.getByLabelText(/Search media/i), { target: { value: 'test' } });
+    
+    // Submit search
+    fireEvent.click(screen.getByRole('button', { name: /Search/i }));
+    
+    // Wait for pagination to appear
+    await waitFor(() => {
+      expect(screen.getByText(/Showing page 1 of 2/i)).toBeInTheDocument();
+    });
+    
+    // Reset mock to check second page call
+    searchService.searchMedia.mockClear();
+    
+    // Click next page button (page 2)
+    fireEvent.click(screen.getByRole('button', { name: /go to page 2/i }));
+    
+    // Check if search was performed with page 2
+    await waitFor(() => {
+      expect(searchService.searchMedia).toHaveBeenCalledWith('test', expect.objectContaining({
+        page: 2
+      }));
+    });
+  });
+  
+  test('applies filters to search', async () => {
+    searchService.searchMedia.mockResolvedValue({
+      data: { results: [], count: 0 }
+    });
+    
+    renderComponent();
+    
+    // Enter search query
+    fireEvent.change(screen.getByLabelText(/Search media/i), { target: { value: 'landscape' } });
+    
+    // Open filters
+    fireEvent.click(screen.getByRole('button', { name: /Filters/i }));
+    
+    // Set creator filter
+    fireEvent.change(screen.getByLabelText(/Creator/i), { target: { value: 'John Doe' } });
+    
+    // Set license filter
+    fireEvent.mouseDown(screen.getByLabelText(/License/i));
+    fireEvent.click(screen.getByText(/CC-BY/i));
+    
+    // Submit search
+    fireEvent.click(screen.getByRole('button', { name: /Search/i }));
+    
+    // Check if search was performed with filters
+    await waitFor(() => {
+      expect(searchService.searchMedia).toHaveBeenCalledWith('landscape', expect.objectContaining({
+        filters: expect.objectContaining({
+          creator: 'John Doe',
+          license: 'CC-BY'
+        })
+      }));
+    });
+  });
 });
