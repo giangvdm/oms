@@ -19,12 +19,15 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  Alert
+  Alert,
+  Chip,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { AuthContext } from '../context/AuthContext';
-import { getSearchHistory, deleteSearch } from '../services/searchService';
+import { getSearchHistory, deleteSearch, clearAllSearchHistory } from '../services/searchService';
 import { useNavigate } from 'react-router-dom';
 
 const SearchHistoryPage = () => {
@@ -32,7 +35,9 @@ const SearchHistoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [selectedSearchId, setSelectedSearchId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -63,9 +68,28 @@ const SearchHistoryPage = () => {
       setSearchHistory(searchHistory.filter(item => item._id !== selectedSearchId));
       setDeleteDialogOpen(false);
       setSelectedSearchId(null);
+      setSuccessMessage('Search deleted successfully');
+      
+      // Auto-hide the success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Error deleting search:', err);
       setError('Failed to delete search. Please try again.');
+    }
+  };
+  
+  const handleClearAllHistory = async () => {
+    try {
+      const response = await clearAllSearchHistory();
+      setSearchHistory([]);
+      setClearDialogOpen(false);
+      setSuccessMessage(`Cleared ${response.deletedCount} search entries`);
+      
+      // Auto-hide the success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Error clearing search history:', err);
+      setError('Failed to clear search history. Please try again.');
     }
   };
   
@@ -76,7 +100,13 @@ const SearchHistoryPage = () => {
   
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleString();
+    return date.toLocaleString('en-GB', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
   
   const handleSearchAgain = (searchItem) => {
@@ -92,9 +122,32 @@ const SearchHistoryPage = () => {
   
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-      <Typography variant="h4" gutterBottom>
-        Search History
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">
+          Search History
+        </Typography>
+        <Box>
+          <Button 
+            variant="outlined" 
+            startIcon={<ArrowBackIcon />} 
+            sx={{ mr: 2 }}
+            onClick={() => navigate('/')}
+          >
+            Back to Search
+          </Button>
+          
+          {searchHistory.length > 0 && (
+            <Button 
+              variant="outlined" 
+              color="error" 
+              startIcon={<DeleteSweepIcon />}
+              onClick={() => setClearDialogOpen(true)}
+            >
+              Clear All History
+            </Button>
+          )}
+        </Box>
+      </Box>
       
       <Typography variant="body1" color="text.secondary" paragraph>
         View and manage your recent searches on Open Media Search.
@@ -103,6 +156,12 @@ const SearchHistoryPage = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
+        </Alert>
+      )}
+      
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {successMessage}
         </Alert>
       )}
       
@@ -131,6 +190,7 @@ const SearchHistoryPage = () => {
                 <TableRow>
                   <TableCell><Typography variant="subtitle2">Query</Typography></TableCell>
                   <TableCell><Typography variant="subtitle2">Type</Typography></TableCell>
+                  <TableCell><Typography variant="subtitle2">Filters</Typography></TableCell>
                   <TableCell><Typography variant="subtitle2">Date</Typography></TableCell>
                   <TableCell><Typography variant="subtitle2">Actions</Typography></TableCell>
                 </TableRow>
@@ -142,9 +202,35 @@ const SearchHistoryPage = () => {
                       <Typography variant="body1">{item.query}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {item.mediaType === 'images' ? 'Images' : 'Audio'}
-                      </Typography>
+                      <Chip 
+                        label={item.mediaType === 'images' ? 'Images' : 'Audio'} 
+                        size="small"
+                        color={item.mediaType === 'images' ? 'primary' : 'secondary'}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {item.filters && Object.keys(item.filters).some(key => 
+                        item.filters[key] && key !== 'page' && key !== 'pageSize'
+                      ) ? (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {Object.entries(item.filters).map(([key, value]) => (
+                            value && key !== 'page' && key !== 'pageSize' ? (
+                              <Chip 
+                                key={key} 
+                                label={`${key}: ${value}`} 
+                                size="small" 
+                                variant="outlined" 
+                                sx={{ fontSize: '0.7rem' }}
+                              />
+                            ) : null
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          No filters
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
@@ -195,6 +281,26 @@ const SearchHistoryPage = () => {
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleDeleteSearch} color="error" variant="contained">
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Clear All History Confirmation Dialog */}
+      <Dialog
+        open={clearDialogOpen}
+        onClose={() => setClearDialogOpen(false)}
+      >
+        <DialogTitle>Clear All Search History</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to clear your entire search history?
+            This will delete all {searchHistory.length} search entries and cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleClearAllHistory} color="error" variant="contained">
+            Clear All History
           </Button>
         </DialogActions>
       </Dialog>

@@ -39,6 +39,17 @@ export const searchMedia = async (query, options = {}) => {
   
   // Try to use our backend API first
   try {
+    // Get auth token from localStorage if available
+    const userInfo = localStorage.getItem('user');
+    const headers = getAuthHeader();
+    
+    if (userInfo) {
+      const user = JSON.parse(userInfo);
+      if (user && user.token) {
+        headers['Authorization'] = `Bearer ${user.token}`;
+      }
+    }
+    
     const response = await axios.get('/api/search', {
       params: {
         query,
@@ -47,7 +58,8 @@ export const searchMedia = async (query, options = {}) => {
         pageSize: options.pageSize || 20,
         ...options.filters
       },
-      timeout: 8000 // 8 second timeout
+      headers,
+      timeout: 8000
     });
     
     // Cache successful result
@@ -165,12 +177,29 @@ export const getMediaDetails = async (id, mediaType = 'images') => {
   }
 };
 
+const getAuthHeader = () => {
+  const userInfo = localStorage.getItem('user');
+  if (!userInfo) return {};
+  
+  try {
+    const userData = JSON.parse(userInfo);
+    if (userData && userData.token) {
+      return { Authorization: `Bearer ${userData.token}` };
+    }
+  } catch (error) {
+    console.error('Error parsing user data:', error);
+  }
+  
+  return {};
+};
+
 /**
  * Get user's search history
  */
 export const getSearchHistory = async () => {
   try {
-    const response = await axios.get('/api/search/history');
+    const headers = getAuthHeader();
+    const response = await axios.get('/api/search/history', { headers });
     return response.data;
   } catch (error) {
     console.error('Error getting search history:', error);
@@ -183,10 +212,25 @@ export const getSearchHistory = async () => {
  */
 export const deleteSearch = async (searchId) => {
   try {
-    const response = await axios.delete(`/api/search/history/${searchId}`);
+    const headers = getAuthHeader();
+    const response = await axios.delete(`/api/search/history/${searchId}`, { headers });
     return response.data;
   } catch (error) {
     console.error('Error deleting search:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clear all search history
+ */
+export const clearAllSearchHistory = async () => {
+  try {
+    const headers = getAuthHeader();
+    const response = await axios.delete('/api/search/history', { headers });
+    return response.data;
+  } catch (error) {
+    console.error('Error clearing search history:', error);
     throw error;
   }
 };
