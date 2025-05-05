@@ -31,8 +31,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import LaunchIcon from '@mui/icons-material/Launch';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { AuthContext } from '../context/AuthContext';
-import { searchMedia, getSearchHistory, deleteSearch } from '../services/searchService';
+import { searchMedia, getSearchHistory, deleteSearch, clearAllSearchHistory } from '../services/searchService';
 
 const SearchComponent = () => {
   // State for search
@@ -41,6 +43,7 @@ const SearchComponent = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [itemsPerPage] = useState(20); // Fixed items per page
@@ -209,12 +212,25 @@ const SearchComponent = () => {
     
     // Apply saved filters if any
     if (historyItem.filters) {
+      // Create a new filters object with only the relevant filters
+      // (excluding pagination parameters)
+      const relevantFilters = {};
+      
+      Object.entries(historyItem.filters).forEach(([key, value]) => {
+        if (value && key !== 'page' && key !== 'pageSize') {
+          relevantFilters[key] = value;
+        }
+      });
+      
+      setFilters(relevantFilters);
+    } else {
+      // Reset filters if none in history
       setFilters({
-        license: historyItem.filters.license || '',
-        licenseType: historyItem.filters.licenseType || '',
-        creator: historyItem.filters.creator || '',
-        tags: historyItem.filters.tags || '',
-        title: historyItem.filters.title || ''
+        license: '',
+        licenseType: '',
+        creator: '',
+        tags: '',
+        title: ''
       });
     }
     
@@ -222,8 +238,21 @@ const SearchComponent = () => {
     setPage(1);
     setShowHistory(false);
     
-    // Search will be triggered by the user clicking the search button
-  }, []);
+    // Perform the search immediately
+    const searchParams = {
+      query: historyItem.query,
+      mediaType: historyItem.mediaType,
+      filters: historyItem.filters || {},
+      page: 1,
+      itemsPerPage
+    };
+    
+    setCurrentSearchParams(searchParams);
+    performSearch(searchParams);
+    
+    // Scroll to top
+    window.scrollTo(0, 0);
+  }, [setQuery, setMediaType, setFilters, setPage, setShowHistory, itemsPerPage, performSearch]);
   
   const handleMediaClick = useCallback((media) => {
     setSelectedMedia(media);
@@ -411,6 +440,13 @@ const SearchComponent = () => {
           {error}
         </Alert>
       )}
+
+      { /* Success message */}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {successMessage}
+        </Alert>
+      )}
       
       {/* Search results */}
       <Box mb={4}>
@@ -543,14 +579,36 @@ const SearchComponent = () => {
         maxWidth="md"
       >
         <DialogTitle>
-          Search History
-          <IconButton
-            aria-label="close"
-            onClick={() => setShowHistory(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Search History</Typography>
+            {searchHistory.length > 0 && (
+              <Button 
+                size="small" 
+                color="error" 
+                startIcon={<DeleteSweepIcon />}
+                onClick={async () => {
+                  try {
+                    await clearAllSearchHistory();
+                    setSearchHistory([]);
+                    // Show temporary success message
+                    setSuccessMessage('All search history cleared successfully');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
+              >
+                Clear All
+              </Button>
+            )}
+            <IconButton
+              aria-label="close"
+              onClick={() => setShowHistory(false)}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent dividers>
           {historyLoading ? (
@@ -569,18 +627,75 @@ const SearchComponent = () => {
                   display="flex"
                   justifyContent="space-between"
                   alignItems="center"
+                  sx={{ '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' } }}
                 >
-                  <Box onClick={() => handleHistoryItemClick(item)} sx={{ cursor: 'pointer', flexGrow: 1 }}>
-                    <Typography variant="subtitle1">
-                      {item.query}
-                    </Typography>
+                  <Box 
+                    onClick={() => handleHistoryItemClick(item)} 
+                    sx={{ cursor: 'pointer', flexGrow: 1 }}
+                  >
+                    <Box display="flex" alignItems="center" mb={0.5}>
+                      <Typography variant="subtitle1">
+                        {item.query}
+                      </Typography>
+                      <Chip 
+                        label={item.mediaType === 'images' ? 'Images' : 'Audio'} 
+                        size="small"
+                        color={item.mediaType === 'images' ? 'primary' : 'secondary'}
+                        variant="outlined"
+                        sx={{ ml: 1, height: 20 }}
+                      />
+                    </Box>
                     <Typography variant="body2" color="text.secondary">
-                      {item.mediaType} • {new Date(item.timestamp).toLocaleString()}
+                      {new Date(item.timestamp).toLocaleString('en-GB')}
                     </Typography>
+                    {item.filters && Object.keys(item.filters).some(key => 
+                      item.filters[key] && key !== 'page' && key !== 'pageSize'
+                    ) && (
+                      <Box mt={0.5} display="flex" flexWrap="wrap" gap={0.5}>
+                        {Object.entries(item.filters).map(([key, value]) => (
+                          value && key !== 'page' && key !== 'pageSize' ? (
+                            <Chip 
+                              key={key} 
+                              label={`${key}: ${value}`} 
+                              size="small" 
+                              variant="outlined" 
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                          ) : null
+                        ))}
+                      </Box>
+                    )}
                   </Box>
-                  <IconButton onClick={() => handleDeleteSearch(item._id)} size="small">
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
+                  <Box>
+                    <Tooltip title="Search again">
+                      <IconButton 
+                        onClick={() => handleHistoryItemClick(item)} 
+                        size="small"
+                        color="primary"
+                        sx={{ mr: 1 }}
+                      >
+                        <SearchIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton 
+                        onClick={() => {
+                          deleteSearch(item._id)
+                            .then(() => {
+                              setSearchHistory(searchHistory.filter(h => h._id !== item._id));
+                            })
+                            .catch(err => {
+                              console.error('Error deleting search:', err);
+                              setError('Failed to delete search');
+                            });
+                        }} 
+                        size="small"
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -590,30 +705,8 @@ const SearchComponent = () => {
             </Typography>
           )}
         </DialogContent>
-
         <DialogActions>
-          {selectedMedia && (
-            <Button 
-              component="a" 
-              href={`/media/${mediaType}/${selectedMedia.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              startIcon={<LaunchIcon />}
-            >
-              View Full Details
-            </Button>
-          )}
-          {selectedMedia && (
-            <Button 
-              component="a" 
-              href={selectedMedia.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              Download
-            </Button>
-          )}
-          <Button onClick={() => setShowMediaDetails(false)}>Close</Button>
+          <Button onClick={() => setShowHistory(false)}>Close</Button>
         </DialogActions>
       </Dialog>
       

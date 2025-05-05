@@ -28,10 +28,31 @@ const LoginPage = () => {
 
     try {
       const res = await axios.post('/api/users/login', formData);
-      login(res.data.user); // save user in context
+      
+      console.log('Login response:', res.data); // Add this for debugging
+      
+      // Check if the response format has token and user separately
+      if (res.data.token && res.data.user) {
+        // Combine token and user into one object
+        const userData = {
+          ...res.data.user,
+          token: res.data.token
+        };
+        login(userData);
+      } else if (res.data.user && res.data.user.token) {
+        // If token is already part of user object
+        login(res.data.user);
+      } else {
+        // Unexpected response format
+        throw new Error('Invalid response format');
+      }
+      
+      // Navigate to home page on successful login
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      setError(err.message)
+      // setError(err.response?.data?.message || 'Login failed');
     }
   };
 

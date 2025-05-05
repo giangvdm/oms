@@ -345,6 +345,30 @@ export const deleteSearch = async (req, res) => {
 };
 
 /**
+ * Delete all search history for a specific user
+ */
+export const clearSearchHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const result = await Search.deleteMany({ userId });
+    
+    res.status(200).json({
+      success: true,
+      message: `Successfully cleared ${result.deletedCount} search entries`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Clear search history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error clearing search history',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Format filters for the Openverse API
  * Transforms frontend filter names to the API expected parameters
  */
