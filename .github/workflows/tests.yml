@@ -34,7 +34,15 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    
+
+    - name: Run Docker Compose
+      env:
+        MONGODB_USER: ${{ secrets.MONGODB_USER }}
+        MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        MONGO_URI: mongodb://${{ secrets.MONGODB_USER }}:${{ secrets.MONGODB_PASSWORD }}@oms-db:27017/openmediasearch?authSource=admin
+      run: docker-compose up -d
+
     - name: Install server dependencies
       run: npm ci
       

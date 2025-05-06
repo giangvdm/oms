@@ -1,33 +1,54 @@
 version: '3.8'
 
 services:
-  oms-server:
-    build:
-      context: ./
-      dockerfile: Dockerfile
-    container_name: oms-server
-    env_file: ./.env
+  # oms-server:
+  #   build:
+  #     context: ./
+  #     dockerfile: Dockerfile
+  #   container_name: oms-server
+  #   env_file: ./.env
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     - oms-db
+
+  # oms-client:
+  #   build:
+  #     context: ./client
+  #     dockerfile: Dockerfile
+  #   container_name: oms-client
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - oms-server
+
+  oms-app:
+    image: node:20.19.0
+    volumes:
+      - ./:/app
     ports:
       - "5000:5000"
+      - "5173:5173"
+    command: ["sleep", "infinity"]
     depends_on:
       - oms-db
-
-  oms-client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: oms-client
-    ports:
-      - "5173:5173"
-    depends_on:
-      - oms-server
 
   oms-db:
     image: mongo:latest
     container_name: oms-db
-    env_file: ./.env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_DATABASE: oms
     volumes:
       - mongo-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
 
 volumes:
   mongo-data:
