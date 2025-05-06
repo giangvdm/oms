@@ -9,7 +9,9 @@ const CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
  * Generate cache key for search parameters
  */
 const generateCacheKey = (query, options) => {
-  return `${query}:${options.mediaType}:${options.page}:${options.pageSize}:${JSON.stringify(options.filters || {})}`;
+  // If timestamp is present, add it to the cache key to force a new search
+  const timestampPart = options.timestamp ? `:${options.timestamp}` : '';
+  return `${query}:${options.mediaType}:${options.page}:${options.pageSize}:${JSON.stringify(options.filters || {})}${timestampPart}`;
 };
 
 /**
