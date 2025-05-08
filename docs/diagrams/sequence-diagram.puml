@@ -1,0 +1,146 @@
+@startuml Search Media Sequence Diagram
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam sequenceArrowThickness 1
+skinparam participantBorderThickness 1
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderThickness 1
+
+actor User
+participant "SearchComponent" as SC
+participant "SearchService" as SS
+participant "OpenverseApi" as OA
+participant "Backend API\n(server)" as API
+participant "MongoDB" as DB
+participant "Openverse API\n(external)" as ExtAPI
+
+title Search Media Sequence Flow
+
+==Initialization==
+User -> SC: Visit application
+activate SC
+SC -> SC: Initialize state
+deactivate SC
+
+==Search Execution==
+User -> SC: Enter search query
+activate SC
+User -> SC: Select media type
+User -> SC: Set filters
+User -> SC: Click search button
+SC -> SS: searchMedia(query, options)
+activate SS
+
+alt Cached Results Available
+    SS -> SS: Check cache
+    SS --> SC: Return cached results
+    SC --> User: Display results
+else No Cache / Cache Expired
+    SS -> API: GET /api/search?query=x&mediaType=y&filters=z
+    activate API
+    
+    note right of API
+        Server processes the search:
+        - Checks authentication
+        - Validates request
+        - Prepares to fetch from Openverse
+    end note
+    
+    alt Authenticated User
+        API -> DB: Find user by token
+        activate DB
+        DB --> API: Return user
+        deactivate DB
+    end
+    
+    API -> OA: getAccessToken()
+    activate OA
+    OA -> ExtAPI: POST /auth_tokens/token/
+    activate ExtAPI
+    ExtAPI --> OA: Return access token
+    deactivate ExtAPI
+    OA --> API: Return access token
+    deactivate OA
+    
+    API -> ExtAPI: GET /images/ or /audio/ with search parameters
+    activate ExtAPI
+    ExtAPI --> API: Return search results
+    deactivate ExtAPI
+    
+    alt User is logged in
+        API -> DB: Save search to history
+        activate DB
+        DB --> API: Confirm save
+        deactivate DB
+    end
+    
+    API --> SS: Return search results
+    deactivate API
+    SS -> SS: Cache results
+    SS --> SC: Return results
+    deactivate SS
+    
+    SC -> SC: Update state with results
+    SC --> User: Display results
+    deactivate SC
+end
+
+==Pagination==
+User -> SC: Click next page
+activate SC
+SC -> SS: searchMedia(query, options) with new page
+activate SS
+SS -> API: GET /api/search with page parameter
+activate API
+API -> ExtAPI: GET /images/ or /audio/ with page parameter
+activate ExtAPI
+ExtAPI --> API: Return paginated results
+deactivate ExtAPI
+API --> SS: Return paginated results
+deactivate API
+SS --> SC: Return paginated results
+deactivate SS
+SC --> User: Display new page of results
+deactivate SC
+
+==Media Interaction==
+User -> SC: Click on media item
+activate SC
+SC -> SC: Open media details dialog
+SC -> SS: getMediaDetails(id, mediaType)
+activate SS
+SS -> API: GET /api/search/details/:id
+activate API
+API -> ExtAPI: GET /images/:id or /audio/:id
+activate ExtAPI
+ExtAPI --> API: Return media details
+deactivate ExtAPI
+API --> SS: Return media details
+deactivate API
+SS --> SC: Return media details
+deactivate SS
+SC -> SC: Update dialog with details
+SC --> User: Display media details
+deactivate SC
+
+==Search History==
+User -> SC: Click history button
+activate SC
+SC -> SS: getSearchHistory()
+activate SS
+SS -> API: GET /api/search/history
+activate API
+API -> DB: Find user's search history
+activate DB
+DB --> API: Return history items
+deactivate DB
+API --> SS: Return search history
+deactivate API
+SS --> SC: Return search history
+deactivate SS
+SC -> SC: Display history dialog
+SC --> User: Show search history
+deactivate SC
+
+@enduml

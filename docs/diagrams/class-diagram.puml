@@ -1,0 +1,181 @@
+@startuml Open Media Search System
+
+' Main styling
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam class {
+    BackgroundColor #white
+    ArrowColor #333333
+    BorderColor #333333
+}
+
+package "Server Models" {
+    class User {
+        -_id: ObjectId
+        -name: String
+        -email: String
+        -passwordHash: String
+        -createdAt: Date
+        -updatedAt: Date
+        +comparePassword(candidatePassword): Boolean
+    }
+
+    class Search {
+        -_id: ObjectId
+        -userId: ObjectId
+        -query: String
+        -mediaType: String
+        -filters: Object
+        -timestamp: Date
+        -createdAt: Date
+        -updatedAt: Date
+    }
+}
+
+package "Server Controllers" {
+    class UserController {
+        +getUsers(req, res): void
+        +createUser(req, res): void
+        +updateUser(req, res): void
+        +loginUser(req, res): void
+        +changePassword(req, res): void
+        +deleteAccount(req, res): void
+    }
+
+    class SearchController {
+        +searchMedia(req, res): void
+        +getMediaDetails(req, res): void
+        +getSearchHistory(req, res): void
+        +deleteSearch(req, res): void
+        +clearSearchHistory(req, res): void
+    }
+}
+
+package "Server Utilities" {
+    class LRUCache {
+        -maxSize: Number
+        -ttl: Number
+        -cache: Map
+        +get(key): any
+        +set(key, value, customTtl): void
+        +delete(key): Boolean
+        +clear(): void
+        +size(): Number
+        +cleanup(): Number
+    }
+}
+
+package "Client Context" {
+    class AuthContext {
+        -user: Object
+        -setUser: Function
+        +login(userData): void
+        +logout(): void
+    }
+}
+
+package "Client Services" {
+    class SearchService {
+        -searchCache: Map
+        +searchMedia(query, options): Promise
+        +getMediaDetails(id, mediaType): Promise
+        +getSearchHistory(): Promise
+        +deleteSearch(searchId): Promise
+        +clearAllSearchHistory(): Promise
+        +clearSearchCache(): void
+    }
+
+    class OpenverseApi {
+        -baseUrl: String
+        -accessToken: String
+        -tokenExpiry: Date
+        -maxRetries: Number
+        -retryDelay: Number
+        -unauthenticatedMode: Boolean
+        +init(clientId, clientSecret): void
+        +retry(fn, retries, delay): Promise
+        +ensureValidToken(): Promise
+        +getAccessToken(): Promise
+        +getHeaders(): Promise
+        +searchMedia(mediaType, query, params): Promise
+        +getMediaDetails(mediaType, id): Promise
+        +reset(): void
+    }
+}
+
+package "Client Components" {
+    class SearchComponent {
+        -query: String
+        -mediaType: String
+        -results: Array
+        -loading: Boolean
+        -error: String
+        -page: Number
+        -totalPages: Number
+        -filters: Object
+        -viewMode: String
+        -showFilters: Boolean
+        +handleSearch(e): void
+        +handlePageChange(event, newPage): void
+        +handleFilterChange(name, value): void
+        +handleMediaClick(media): void
+    }
+
+    class AdvancedFiltersComponent {
+        -activeTab: Number
+        +handleFilterChange(e): void
+        +handleClearFilter(filterName): void
+        +handleTabChange(event, newValue): void
+    }
+
+    class MediaDetailsComponent {
+        -mediaDetails: Object
+        -loading: Boolean
+        -error: String
+        -isPlaying: Boolean
+        +toggleAudio(): void
+        +handleAudioEnded(): void
+    }
+
+    class NavBar {
+        -anchorEl: Object
+        -drawerOpen: Boolean
+        +handleUserMenuClick(event): void
+        +handleClose(): void
+        +handleLogout(): void
+        +toggleDrawer(open): Function
+    }
+
+    class SearchHistoryComponent {
+        -searchHistory: Array
+        -loading: Boolean
+        -error: String
+        +fetchSearchHistory(): Promise
+        +handleDeleteSearch(e, id): Promise
+        +handleHistoryItemClick(item): void
+    }
+
+    class ProtectedRoute {
+        +render(): Element
+    }
+}
+
+' Relationships
+User "1" -- "many" Search : has >
+UserController -- User : manages >
+SearchController -- Search : manages >
+SearchController -- LRUCache : uses >
+SearchService -- OpenverseApi : uses >
+AuthContext -- User : authenticates >
+SearchComponent -- SearchService : uses >
+SearchComponent -- AuthContext : uses >
+SearchComponent *-- AdvancedFiltersComponent : contains
+SearchComponent *-- MediaDetailsComponent : contains
+SearchComponent *-- SearchHistoryComponent : contains
+SearchHistoryComponent -- SearchService : uses >
+ProtectedRoute -- AuthContext : uses >
+
+@enduml
