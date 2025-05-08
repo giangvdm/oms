@@ -22,7 +22,9 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  Tooltip
+  Tooltip,
+  Paper,
+  Divider
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -33,8 +35,16 @@ import PauseIcon from '@mui/icons-material/Pause';
 import LaunchIcon from '@mui/icons-material/Launch';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import ClearIcon from '@mui/icons-material/Clear';
+import GridViewIcon from '@mui/icons-material/GridView';
+import ViewListIcon from '@mui/icons-material/ViewList';
 import { AuthContext } from '../context/AuthContext';
 import { searchMedia, getSearchHistory, deleteSearch, clearAllSearchHistory } from '../services/searchService';
+
+// Import custom components
+import SortOptionsComponent from './SortOptionsComponent';
+import ActiveFiltersComponent from './ActiveFiltersComponent';
+import AdvancedFiltersComponent from './AdvancedFiltersComponent';
 
 const SearchComponent = () => {
   // State for search
@@ -46,7 +56,11 @@ const SearchComponent = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [itemsPerPage] = useState(20); // Fixed items per page
+  const [totalResults, setTotalResults] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(20); // Default items per page
+  
+  // State for view options
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   
   // State for filters
   const [showFilters, setShowFilters] = useState(false);
@@ -55,7 +69,14 @@ const SearchComponent = () => {
     licenseType: '',
     creator: '',
     tags: '',
-    title: ''
+    title: '',
+    // New filter options
+    category: '',
+    orientation: '', // For images only
+    size: '', // For images only
+    duration: '', // For audio only
+    source: '',
+    sortBy: 'relevance' // Default sort option
   });
   
   // State for audio player
@@ -77,6 +98,13 @@ const SearchComponent = () => {
   
   const { user } = useContext(AuthContext);
   
+  // Active filters count (for badge)
+  const activeFiltersCount = useMemo(() => {
+    return Object.entries(filters).filter(
+      ([key, value]) => value !== '' && key !== 'sortBy' && key !== 'page' && key !== 'pageSize'
+    ).length;
+  }, [filters]);
+  
   // Load search history when component mounts
   useEffect(() => {
     if (user) {
@@ -94,6 +122,25 @@ const SearchComponent = () => {
       }
     }
   }, [isPlaying, currentAudio]);
+  
+  // Reset specific filters when media type changes
+  useEffect(() => {
+    // Reset media type specific filters
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      
+      if (mediaType === 'images') {
+        // Reset audio specific filters
+        delete newFilters.duration;
+      } else {
+        // Reset image specific filters
+        delete newFilters.orientation;
+        delete newFilters.size;
+      }
+      
+      return newFilters;
+    });
+  }, [mediaType]);
   
   // Handle audio end
   const handleAudioEnd = useCallback(() => {
@@ -125,15 +172,22 @@ const SearchComponent = () => {
       setLoading(true);
       setError('');
       
+      // Create a copy of filters excluding empty values
+      const activeFilters = Object.fromEntries(
+        Object.entries(searchParams.filters).filter(([_, v]) => v !== '')
+      );
+      
       const response = await searchMedia(searchParams.query, {
         mediaType: searchParams.mediaType,
         page: searchParams.page,
         pageSize: searchParams.itemsPerPage,
-        ...Object.fromEntries(Object.entries(searchParams.filters).filter(([_, v]) => v !== ''))
+        filters: activeFilters,
+        timestamp: searchParams.timestamp // Pass timestamp to avoid cache
       });
       
       setResults(response.data.results);
       setTotalPages(response.data.page_count || 0);
+      setTotalResults(response.data.count || 0);
       setLoading(false);
       
       // Refresh search history if user is logged in
@@ -147,6 +201,52 @@ const SearchComponent = () => {
     }
   }, [user, loadSearchHistory]);
   
+  // Handle filter change
+  const handleFilterChange = useCallback((name, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }, []);
+  
+  // Use our existing handle function but adapt it to the new component pattern
+  const handleSingleFilterChange = useCallback((e) => {
+    const { name, value } = e.target;
+    handleFilterChange(name, value);
+  }, [handleFilterChange]);
+  
+  // Reset all filters
+  const handleResetFilters = () => {
+    const defaultFilters = {
+      license: '',
+      licenseType: '',
+      creator: '',
+      tags: '',
+      title: '',
+      category: '',
+      orientation: mediaType === 'images' ? '' : undefined,
+      size: mediaType === 'images' ? '' : undefined,
+      duration: mediaType === 'audio' ? '' : undefined,
+      source: '',
+      sortBy: 'relevance'
+    };
+    
+    setFilters(defaultFilters);
+    
+    // If there's an existing search, perform it again with reset filters
+    if (currentSearchParams) {
+      const updatedParams = {
+        ...currentSearchParams,
+        filters: defaultFilters,
+        page: 1 // Reset to first page when resetting filters
+      };
+      
+      setPage(1);
+      setCurrentSearchParams(updatedParams);
+      performSearch(updatedParams);
+    }
+  };
+  
   // Handle initial search
   const handleSearch = useCallback((e) => {
     e?.preventDefault();
@@ -154,13 +254,17 @@ const SearchComponent = () => {
     // Reset to first page when starting a new search
     setPage(1);
     
+    // Add a timestamp to ensure we don't get cached results when filters change
+    const timestamp = Date.now();
+    
     // Save current search parameters
     const searchParams = {
       query,
       mediaType,
       filters,
       page: 1, // Always start on first page for a new search
-      itemsPerPage
+      itemsPerPage,
+      timestamp // Add timestamp to force new search
     };
     
     setCurrentSearchParams(searchParams);
@@ -187,14 +291,24 @@ const SearchComponent = () => {
     window.scrollTo(0, 0);
   }, [currentSearchParams, performSearch]);
   
-  // Update filters
-  const handleFilterChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }, []);
+  // Handle items per page change
+  const handleItemsPerPageChange = (event) => {
+    const newItemsPerPage = parseInt(event.target.value);
+    setItemsPerPage(newItemsPerPage);
+    
+    // Update search parameters with new page size and reset to page 1
+    if (currentSearchParams) {
+      const updatedParams = {
+        ...currentSearchParams,
+        page: 1,
+        itemsPerPage: newItemsPerPage
+      };
+      
+      setPage(1);
+      setCurrentSearchParams(updatedParams);
+      performSearch(updatedParams);
+    }
+  };
   
   const handleDeleteSearch = useCallback(async (id) => {
     try {
@@ -230,7 +344,13 @@ const SearchComponent = () => {
         licenseType: '',
         creator: '',
         tags: '',
-        title: ''
+        title: '',
+        category: '',
+        orientation: mediaType === 'images' ? '' : undefined,
+        size: mediaType === 'images' ? '' : undefined,
+        duration: mediaType === 'audio' ? '' : undefined,
+        source: '',
+        sortBy: 'relevance'
       });
     }
     
@@ -252,7 +372,7 @@ const SearchComponent = () => {
     
     // Scroll to top
     window.scrollTo(0, 0);
-  }, [setQuery, setMediaType, setFilters, setPage, setShowHistory, itemsPerPage, performSearch]);
+  }, [itemsPerPage, performSearch, mediaType]);
   
   const handleMediaClick = useCallback((media) => {
     setSelectedMedia(media);
@@ -321,6 +441,17 @@ const SearchComponent = () => {
               variant="outlined"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                endAdornment: query ? (
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setQuery('')}
+                    aria-label="clear search"
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                ) : null
+              }}
             />
           </Grid>
           <Grid item xs={12} sm={2}>
@@ -351,8 +482,14 @@ const SearchComponent = () => {
                 variant="outlined"
                 onClick={() => setShowFilters(!showFilters)}
                 startIcon={<FilterListIcon />}
+                color={activeFiltersCount > 0 ? "primary" : "inherit"}
+                sx={{
+                  minWidth: '120px',
+                  px: 2,
+                  ...(activeFiltersCount > 0 ? { fontWeight: 'bold' } : {})
+                }}
               >
-                Filters
+                {activeFiltersCount > 0 ? `${activeFiltersCount}` : 'Filters'}
               </Button>
               {user && (
                 <Button
@@ -362,6 +499,10 @@ const SearchComponent = () => {
                     setShowHistory(true);
                   }}
                   startIcon={<HistoryIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    px: 2
+                  }}
                 >
                   History
                 </Button>
@@ -370,69 +511,51 @@ const SearchComponent = () => {
           </Grid>
         </Grid>
         
-        {/* Filters */}
-        {showFilters && (
-          <Box mt={2} p={2} border="1px solid #e0e0e0" borderRadius={1}>
-            <Typography variant="h6" gutterBottom>Advanced Filters</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  label="Creator"
-                  name="creator"
-                  value={filters.creator}
-                  onChange={handleFilterChange}
-                  variant="outlined"
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  label="Title contains"
-                  name="title"
-                  value={filters.title}
-                  onChange={handleFilterChange}
-                  variant="outlined"
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  label="Tags"
-                  name="tags"
-                  value={filters.tags}
-                  onChange={handleFilterChange}
-                  variant="outlined"
-                  size="small"
-                  helperText="Comma-separated values"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>License</InputLabel>
-                  <Select
-                    name="license"
-                    value={filters.license}
-                    label="License"
-                    onChange={handleFilterChange}
-                  >
-                    <MenuItem value="">Any</MenuItem>
-                    <MenuItem value="CC0">CC0</MenuItem>
-                    <MenuItem value="CC-BY">CC-BY</MenuItem>
-                    <MenuItem value="CC-BY-SA">CC-BY-SA</MenuItem>
-                    <MenuItem value="CC-BY-ND">CC-BY-ND</MenuItem>
-                    <MenuItem value="CC-BY-NC">CC-BY-NC</MenuItem>
-                    <MenuItem value="CC-BY-NC-SA">CC-BY-NC-SA</MenuItem>
-                    <MenuItem value="CC-BY-NC-ND">CC-BY-NC-ND</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+        {/* Sort options - show above search results when filters aren't displayed */}
+        {!showFilters && results.length > 0 && (
+          <Box mt={2} display="flex" justifyContent="flex-end">
+            <SortOptionsComponent 
+              mediaType={mediaType}
+              currentSort={filters.sortBy || 'relevance'}
+              onSortChange={(sortOption) => {
+                handleFilterChange('sortBy', sortOption);
+                // Apply sort immediately
+                const updatedParams = {
+                  ...currentSearchParams,
+                  filters: {
+                    ...currentSearchParams.filters,
+                    sortBy: sortOption
+                  },
+                  page: 1 // Reset to first page when changing sort
+                };
+                setPage(1);
+                setCurrentSearchParams(updatedParams);
+                performSearch(updatedParams);
+              }}
+            />
           </Box>
         )}
+        
+        {/* Filters */}
+        {showFilters && (
+          <AdvancedFiltersComponent 
+            mediaType={mediaType}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onResetFilters={handleResetFilters}
+            onSearch={handleSearch}
+          />
+        )}
       </Box>
+      
+      {/* Display active filter chips even when filter panel is closed */}
+      {!showFilters && activeFiltersCount > 0 && (
+        <ActiveFiltersComponent 
+          filters={filters}
+          onClearFilter={(filterName) => handleFilterChange(filterName, '')}
+          onClearAllFilters={handleResetFilters}
+        />
+      )}
       
       {/* Error message */}
       {error && (
@@ -441,7 +564,7 @@ const SearchComponent = () => {
         </Alert>
       )}
 
-      { /* Success message */}
+      {/* Success message */}
       {successMessage && (
         <Alert severity="success" sx={{ mb: 2 }}>
           {successMessage}
@@ -456,69 +579,206 @@ const SearchComponent = () => {
           </Box>
         ) : results.length > 0 ? (
           <>
-            <Typography variant="h6" gutterBottom>
-              Search Results {totalPages > 0 && `(Page ${page} of ${totalPages})`}
-            </Typography>
-            <Grid container spacing={3}>
-              {results.map((item) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    {mediaType === 'images' ? (
-                      <CardMedia
-                        component="img"
-                        height="200"
-                        image={item.thumbnail || item.url}
-                        alt={item.title}
-                        sx={{ objectFit: 'cover', cursor: 'pointer' }}
-                        onClick={() => handleMediaClick(item)}
-                      />
-                    ) : (
-                      <Box 
-                        height="200" 
-                        display="flex" 
-                        alignItems="center" 
-                        justifyContent="center"
-                        bgcolor="rgba(0,0,0,0.05)"
-                        sx={{ cursor: 'pointer' }}
-                        onClick={() => handleMediaClick(item)}
-                      >
-                        <IconButton
-                          size="large"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleAudioPlayback(item);
-                          }}
-                        >
-                          {currentAudio && currentAudio.id === item.id && isPlaying ? (
-                            <PauseIcon fontSize="large" />
-                          ) : (
-                            <PlayArrowIcon fontSize="large" />
-                          )}
-                        </IconButton>
-                        <Typography variant="body2" color="text.secondary" align="center">
-                          {item.duration ? `${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}` : 'Audio'}
-                        </Typography>
-                      </Box>
-                    )}
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="subtitle1" noWrap>
-                        {item.title || 'Untitled'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        By {item.creator || 'Unknown'}
-                      </Typography>
-                      <Box mt={1}>
-                        <Chip 
-                          label={item.license || 'Unknown License'} 
-                          size="small" 
-                          sx={{ mr: 0.5, mb: 0.5 }}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                Search Results {totalResults > 0 && `(${totalResults} items found)`}
+              </Typography>
+              
+              <Box display="flex" alignItems="center" gap={2}>
+                {/* Items per page selector */}
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Items per page</InputLabel>
+                  <Select
+                    value={itemsPerPage}
+                    label="Items per page"
+                    onChange={handleItemsPerPageChange}
+                  >
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={20}>20</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                {/* View toggle */}
+                <Box>
+                  <Tooltip title="Grid view">
+                    <IconButton 
+                      onClick={() => setViewMode('grid')}
+                      color={viewMode === 'grid' ? 'primary' : 'default'}
+                    >
+                      <GridViewIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="List view">
+                    <IconButton 
+                      onClick={() => setViewMode('list')}
+                      color={viewMode === 'list' ? 'primary' : 'default'}
+                    >
+                      <ViewListIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Box>
+            
+            {/* Grid view */}
+            {viewMode === 'grid' && (
+              <Grid container spacing={3}>
+                {results.map((item) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      {mediaType === 'images' ? (
+                        <CardMedia
+                          component="img"
+                          height="200"
+                          image={item.thumbnail || item.url}
+                          alt={item.title}
+                          sx={{ objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => handleMediaClick(item)}
                         />
+                      ) : (
+                        <Box 
+                          height="200" 
+                          display="flex" 
+                          alignItems="center" 
+                          justifyContent="center"
+                          bgcolor="rgba(0,0,0,0.05)"
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => handleMediaClick(item)}
+                        >
+                          <IconButton
+                            size="large"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAudioPlayback(item);
+                            }}
+                          >
+                            {currentAudio && currentAudio.id === item.id && isPlaying ? (
+                              <PauseIcon fontSize="large" />
+                            ) : (
+                              <PlayArrowIcon fontSize="large" />
+                            )}
+                          </IconButton>
+                          <Typography variant="body2" color="text.secondary" align="center">
+                            {item.duration ? `${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}` : 'Audio'}
+                          </Typography>
+                        </Box>
+                      )}
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Typography variant="subtitle1" noWrap>
+                          {item.title || 'Untitled'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          By {item.creator || 'Unknown'}
+                        </Typography>
+                        <Box mt={1}>
+                          <Chip 
+                            label={item.license || 'Unknown License'} 
+                            size="small" 
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+            
+            {/* List view */}
+            {viewMode === 'list' && (
+              <Paper>
+                {results.map((item, index) => (
+                  <React.Fragment key={item.id}>
+                    <Box 
+                      p={2} 
+                      display="flex" 
+                      sx={{ 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(0,0,0,0.03)' }
+                      }}
+                      onClick={() => handleMediaClick(item)}
+                    >
+                      {/* Thumbnail/Audio preview */}
+                      <Box mr={2} sx={{ width: 100, height: 100, flexShrink: 0 }}>
+                        {mediaType === 'images' ? (
+                          <img 
+                            src={item.thumbnail || item.url} 
+                            alt={item.title}
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover',
+                              borderRadius: 4
+                            }}
+                          />
+                        ) : (
+                          <Box 
+                            display="flex" 
+                            alignItems="center" 
+                            justifyContent="center"
+                            bgcolor="rgba(0,0,0,0.05)"
+                            height="100%"
+                            borderRadius={1}
+                          >
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleAudioPlayback(item);
+                              }}
+                            >
+                              {currentAudio && currentAudio.id === item.id && isPlaying ? (
+                                <PauseIcon />
+                              ) : (
+                                <PlayArrowIcon />
+                              )}
+                            </IconButton>
+                          </Box>
+                        )}
                       </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
+                      
+                      {/* Content */}
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          {item.title || 'Untitled'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          By {item.creator || 'Unknown'}
+                        </Typography>
+                        <Box mt={1} display="flex" flexWrap="wrap" gap={0.5}>
+                          <Chip 
+                            label={item.license || 'Unknown License'} 
+                            size="small" 
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                          {item.tags && item.tags.length > 0 && (
+                            item.tags.slice(0, 3).map((tag, tagIndex) => (
+                              <Chip 
+                                key={tagIndex}
+                                label={tag.name || tag} 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ mr: 0.5, mb: 0.5 }}
+                              />
+                            ))
+                          )}
+                          {item.tags && item.tags.length > 3 && (
+                            <Chip 
+                              label={`+${item.tags.length - 3} more`} 
+                              size="small" 
+                              variant="outlined"
+                              sx={{ mr: 0.5, mb: 0.5 }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                    {index < results.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </Paper>
+            )}
             
             {/* Pagination */}
             {totalPages > 1 && (

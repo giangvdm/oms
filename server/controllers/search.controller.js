@@ -118,7 +118,15 @@ const generateCacheKey = (params) => {
  */
 export const searchMedia = async (req, res) => {
   try {
-    const { query, mediaType = 'images', page = 1, pageSize = 20, ...filters } = req.query;
+    const { 
+      query, 
+      mediaType = 'images', 
+      page = 1, 
+      pageSize = 20, 
+      sortBy = 'relevance',
+      ...otherFilters 
+    } = req.query;
+    
     const userId = req.user?.id; // User ID from auth middleware
     
     if (!query) {
@@ -140,7 +148,12 @@ export const searchMedia = async (req, res) => {
             userId,
             query,
             mediaType,
-            filters: { ...filters, page, pageSize },
+            filters: { 
+              sortBy,
+              ...otherFilters, 
+              page, 
+              pageSize 
+            },
             timestamp: new Date()
           });
         } catch (historyError) {
@@ -171,13 +184,19 @@ export const searchMedia = async (req, res) => {
       
       const endpoint = `${OPENVERSE_API_BASE_URL}/${mediaType === 'audio' ? 'audio' : 'images'}/`;
       
+      // Format filters including sorting
+      const formattedFilters = formatFilters(
+        { sortBy, ...otherFilters },
+        mediaType
+      );
+      
       return axios.get(endpoint, {
         headers,
         params: {
           q: query,
           page,
           page_size: pageSize,
-          ...formatFilters(filters, mediaType)
+          ...formattedFilters
         },
         timeout: 15000 // 15 second timeout
       });
@@ -193,7 +212,12 @@ export const searchMedia = async (req, res) => {
           userId,
           query,
           mediaType,
-          filters: { ...filters, page, pageSize },
+          filters: { 
+            sortBy,
+            ...otherFilters, 
+            page, 
+            pageSize 
+          },
           timestamp: new Date()
         });
       } catch (historyError) {
@@ -396,26 +420,81 @@ const formatFilters = (filters, mediaType) => {
     formattedFilters.title = filters.title;
   }
   
-  // Additional filters specific to images or audio
-  if (mediaType === 'images') {
-    if (filters.source) {
-      formattedFilters.source = filters.source;
+  if (filters.source) {
+    formattedFilters.source = filters.source;
+  }
+  
+  if (filters.category) {
+    formattedFilters.category = filters.category;
+  }
+  
+  // Handle sorting based on sortBy parameter
+  if (filters.sortBy) {
+    switch (filters.sortBy) {
+      case 'relevance':
+        // Default - no need to specify
+        break;
+      case 'title':
+        formattedFilters.sort = 'title';
+        break;
+      case 'creator':
+        formattedFilters.sort = 'creator';
+        break;
+      case 'newest':
+        formattedFilters.sort = 'created_on';
+        formattedFilters.order = 'desc';
+        break;
+      case 'oldest':
+        formattedFilters.sort = 'created_on';
+        formattedFilters.order = 'asc';
+        break;
+      case 'popularity':
+        formattedFilters.sort = 'popularity';
+        formattedFilters.order = 'desc';
+        break;
+      case 'duration':
+        // Only applicable for audio
+        if (mediaType === 'audio') {
+          formattedFilters.sort = 'duration';
+          formattedFilters.order = 'desc';
+        }
+        break;
+      default:
+        // Ignore unrecognized sort options
+        break;
     }
-    
-    if (filters.category) {
-      formattedFilters.category = filters.category;
+  }
+  
+  // Additional filters specific to media type
+  if (mediaType === 'images') {
+    // Image specific filters
+    if (filters.orientation) {
+      formattedFilters.orientation = filters.orientation;
     }
     
     if (filters.size) {
       formattedFilters.size = filters.size;
     }
+    
+    if (filters.aspectRatio) {
+      formattedFilters.aspect_ratio = filters.aspectRatio;
+    }
+    
+    if (filters.extension) {
+      formattedFilters.extension = filters.extension;
+    }
   } else if (mediaType === 'audio') {
+    // Audio specific filters
     if (filters.duration) {
       formattedFilters.duration = filters.duration;
     }
     
     if (filters.genres) {
       formattedFilters.genres = filters.genres;
+    }
+    
+    if (filters.audioExtension) {
+      formattedFilters.extension = filters.audioExtension;
     }
   }
   
