@@ -116,7 +116,7 @@ const ConsentSection = ({
         }
         label={
           <Typography variant="body2">
-            I agree to the <Link href="#" target="_blank">Terms and Conditions</Link> and <Link href="#" target="_blank">Privacy Policy</Link>
+            I agree to the <Link href="terms" target="_blank">Terms and Conditions</Link> and <Link href="privacy" target="_blank">Privacy Policy</Link>
           </Typography>
         }
         sx={{ 
