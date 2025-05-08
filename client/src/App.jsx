@@ -2,13 +2,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
 import HomePage from './pages/HomePage';
 import NavBar from './components/NavBar';
+import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SearchHistoryPage from './pages/SearchHistoryPage';
 import MediaDetailsPage from './pages/MediaDetailsPage';
 import ProfilePage from './pages/ProfilePage';
+import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import UserGuidePage from './pages/UserGuidePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useEffect } from 'react';
 import axios from 'axios';
@@ -97,30 +102,56 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
-          <NavBar />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route 
-              path="/history" 
-              element={
-                <ProtectedRoute>
-                  <SearchHistoryPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="/media/:mediaType/:id" element={<MediaDetailsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          {/* Flex container to make footer stick to bottom */}
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            minHeight: '100vh'
+          }}>
+            <NavBar />
+            {/* Main content area with minimum height */}
+            <Box 
+              component="main" 
+              sx={{ 
+                flex: 1, 
+                display: 'flex',
+                flexDirection: 'column',
+                // Add padding to ensure content doesn't touch the edges
+                pt: { xs: 2, sm: 3 },
+                pb: { xs: 4, sm: 6 },
+                // Ensure minimum height for sparse content pages
+                minHeight: { xs: '70vh', sm: '75vh', md: '80vh' }
+              }}
+            >
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/terms" element={<TermsAndConditionsPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/guide" element={<UserGuidePage />} />
+                <Route 
+                  path="/history" 
+                  element={
+                    <ProtectedRoute>
+                      <SearchHistoryPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route path="/media/:mediaType/:id" element={<MediaDetailsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Box>
+            <Footer />
+          </Box>
         </Router>
       </AuthProvider>
     </ThemeProvider>

@@ -1,12 +1,21 @@
 import React from 'react';
-import { Container } from '@mui/material';
+import { Container, Box } from '@mui/material';
 import SearchComponent from '../components/SearchComponent';
 
 const HomePage = () => {
   return (
-    <Container maxWidth="lg">
-      <SearchComponent />
-    </Container>
+    <Box 
+      sx={{ 
+        minHeight: { xs: '70vh', sm: '75vh', md: '80vh' },
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start'
+      }}
+    >
+      <Container maxWidth="lg">
+        <SearchComponent />
+      </Container>
+    </Box>
   );
 };
 
