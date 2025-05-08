@@ -8,15 +8,15 @@ import {
   TextField,
   Button,
   Avatar,
-  Divider,
-  Card,
-  CardContent,
   Alert,
   Snackbar,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  Divider,
+  Card,
+  CardContent
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -24,6 +24,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
+import SecurityIcon from '@mui/icons-material/Security';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -40,36 +41,64 @@ const ProfilePage = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   
-  const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || ''
+  // State for password change
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
   });
   
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
+  // Handle password change
+  const handlePasswordChange = (e) => {
+    setPasswordData({
+      ...passwordData,
       [e.target.name]: e.target.value
     });
   };
   
-  const handleSubmit = async (e) => {
+  // Handle password update
+  const handlePasswordUpdate = async (e) => {
     e.preventDefault();
     
+    // Validate passwords
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setSnackbarMessage('New passwords do not match');
+      setSnackbarSeverity('error');
+      setShowSnackbar(true);
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      setSnackbarMessage('Password must be at least 6 characters');
+      setSnackbarSeverity('error');
+      setShowSnackbar(true);
+      return;
+    }
+    
     try {
-      // This would be implemented with a real API call in a complete application
-      // await axios.put(`/api/users/${user.id}`, formData);
+      await axios.post(`/api/users/change-password`, {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
       
       // For now, just show a success message
-      setSnackbarMessage('Profile updated successfully!');
+      setSnackbarMessage('Password updated successfully!');
       setSnackbarSeverity('success');
       setShowSnackbar(true);
+      
+      // Reset form
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
     } catch (err) {
-      console.error('Error updating profile:', err);
-      setSnackbarMessage('Failed to update profile. Please try again.');
+      console.error('Error updating password:', err);
+      setSnackbarMessage(err.response?.data?.message || 'Failed to update password. Please try again.');
       setSnackbarSeverity('error');
       setShowSnackbar(true);
     }
@@ -167,49 +196,47 @@ const ProfilePage = () => {
           </Card>
         </Grid>
         
-        {/* Profile Settings */}
+        {/* Account Security Section - Moved up to occupy right column */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Edit Profile
-            </Typography>
+            <Box display="flex" alignItems="center" mb={2}>
+              <SecurityIcon sx={{ mr: 1 }} color="primary" />
+              <Typography variant="h5" gutterBottom>
+                Account Security
+              </Typography>
+            </Box>
+            
             <Typography variant="body2" color="text.secondary" paragraph>
-              Update your profile information
+              Manage your account security settings and update your password
             </Typography>
             
-            <Divider sx={{ mb: 3 }} />
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Keep your account secure by using a strong password and updating it regularly.
+            </Alert>
             
-            <Box component="form" onSubmit={handleSubmit}>
+            <Box component="form" onSubmit={handlePasswordUpdate}>
               <Grid container spacing={3}>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
+                    label="Current Password"
+                    name="currentPassword"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={handlePasswordChange}
                     required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    disabled // Email typically shouldn't be changed easily
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
                     label="New Password"
-                    name="password"
+                    name="newPassword"
                     type="password"
-                    helperText="Leave blank to keep current password"
+                    value={passwordData.newPassword}
+                    onChange={handlePasswordChange}
+                    required
+                    helperText="Password must be at least 6 characters"
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -218,6 +245,9 @@ const ProfilePage = () => {
                     label="Confirm New Password"
                     name="confirmPassword"
                     type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={handlePasswordChange}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -225,39 +255,11 @@ const ProfilePage = () => {
                     type="submit" 
                     variant="contained" 
                     color="primary"
-                    sx={{ mr: 1 }}
                   >
-                    Save Changes
-                  </Button>
-                  <Button 
-                    variant="outlined" 
-                    onClick={() => navigate('/')}
-                  >
-                    Cancel
+                    Update Password
                   </Button>
                 </Grid>
               </Grid>
-            </Box>
-          </Paper>
-          
-          <Paper sx={{ p: 3, mt: 4 }}>
-            <Typography variant="h5" gutterBottom>
-              Account Security
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Manage your account security settings
-            </Typography>
-            
-            <Divider sx={{ mb: 3 }} />
-            
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Keep your account secure by using a strong password and updating it regularly.
-            </Alert>
-            
-            <Box>
-              <Button variant="outlined" color="primary">
-                Change Password
-              </Button>
             </Box>
           </Paper>
         </Grid>
