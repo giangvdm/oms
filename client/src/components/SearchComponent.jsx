@@ -483,7 +483,11 @@ const SearchComponent = () => {
                 onClick={() => setShowFilters(!showFilters)}
                 startIcon={<FilterListIcon />}
                 color={activeFiltersCount > 0 ? "primary" : "inherit"}
-                sx={activeFiltersCount > 0 ? { fontWeight: 'bold' } : {}}
+                sx={{
+                  minWidth: '120px',
+                  px: 2,
+                  ...(activeFiltersCount > 0 ? { fontWeight: 'bold' } : {})
+                }}
               >
                 {activeFiltersCount > 0 ? `${activeFiltersCount}` : 'Filters'}
               </Button>
@@ -495,6 +499,10 @@ const SearchComponent = () => {
                     setShowHistory(true);
                   }}
                   startIcon={<HistoryIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    px: 2
+                  }}
                 >
                   History
                 </Button>

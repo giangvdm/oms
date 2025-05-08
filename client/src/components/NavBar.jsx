@@ -181,16 +181,6 @@ const NavBar = () => {
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {user ? (
                 <>
-                  <Button 
-                    color="inherit" 
-                    startIcon={<HistoryIcon />}
-                    component={Link} 
-                    to="/history"
-                    sx={{ mr: 1 }}
-                  >
-                    History
-                  </Button>
-                  
                   <Tooltip title="Account settings">
                     <IconButton
                       onClick={handleUserMenuClick}

@@ -221,6 +221,10 @@ const AdvancedFiltersComponent = ({
                     value={filters.orientation || ''}
                     label="Orientation"
                     onChange={handleFilterChange}
+                    sx={{
+                      minWidth: '120px',
+                      px: 2
+                    }}
                   >
                     <MenuItem value="">Any</MenuItem>
                     <MenuItem value="tall">Tall</MenuItem>
@@ -237,6 +241,10 @@ const AdvancedFiltersComponent = ({
                     value={filters.size || ''}
                     label="Size"
                     onChange={handleFilterChange}
+                    sx={{
+                      minWidth: '120px',
+                      px: 2
+                    }}
                   >
                     <MenuItem value="">Any</MenuItem>
                     <MenuItem value="small">Small</MenuItem>
@@ -358,6 +366,10 @@ const AdvancedFiltersComponent = ({
                   value={filters.license || ''}
                   label="License"
                   onChange={handleFilterChange}
+                  sx={{
+                    minWidth: '120px',
+                    px: 2
+                  }}
                 >
                   <MenuItem value="">Any</MenuItem>
                   <MenuItem value="CC0">CC0 (Public Domain)</MenuItem>
@@ -379,6 +391,10 @@ const AdvancedFiltersComponent = ({
                   value={filters.licenseType || ''}
                   label="License Type"
                   onChange={handleFilterChange}
+                  sx={{
+                    minWidth: '120px',
+                    px: 2
+                  }}
                 >
                   <MenuItem value="">Any</MenuItem>
                   <MenuItem value="commercial">Commercial Use Allowed</MenuItem>
