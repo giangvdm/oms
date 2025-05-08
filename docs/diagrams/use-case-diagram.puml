@@ -1,0 +1,100 @@
+@startuml Open Media Search Use Case Diagram
+
+!theme plain
+skinparam actorStyle awesome
+skinparam usecaseArrowThickness 1.0
+skinparam usecaseBorderThickness 1.0
+skinparam actorBorderThickness 1.0
+skinparam packageBorderThickness 1.0
+skinparam usecaseBackgroundColor #f5f5f5
+skinparam actorBackgroundColor #f5f5f5
+
+title Open Media Search - Use Case Diagram
+
+' Define actors
+:Guest User: as Guest
+:Registered User: as RegUser
+:System Admin: as Admin
+
+' Package for media search functionality
+package "Media Search" {
+  usecase "Search for Media" as UC1
+  usecase "Apply Advanced Filters" as UC2
+  usecase "View Media Details" as UC3
+  usecase "Download Media" as UC4
+  usecase "Play Audio Content" as UC5
+  usecase "Sort Search Results" as UC6
+  usecase "Paginate Through Results" as UC7
+}
+
+' Package for user account management
+package "Account Management" {
+  usecase "Register Account" as UC8
+  usecase "Login to Account" as UC9
+  usecase "Update Password" as UC10
+  usecase "Delete Account" as UC11
+  usecase "View Profile" as UC12
+  usecase "Logout" as UC13
+}
+
+' Package for search history functionality
+package "Search History" {
+  usecase "Save Search History" as UC14
+  usecase "View Search History" as UC15
+  usecase "Delete Individual Search" as UC16
+  usecase "Clear All Search History" as UC17
+  usecase "Repeat Previous Search" as UC18
+}
+
+' Package for system administration
+package "System Administration" {
+  usecase "Monitor System Health" as UC19
+  usecase "Manage User Accounts" as UC20
+  usecase "Configure API Integration" as UC21
+}
+
+' Define relationships
+' Guest user functionality
+Guest --> UC1
+Guest --> UC2
+Guest --> UC3
+Guest --> UC4
+Guest --> UC5
+Guest --> UC6
+Guest --> UC7
+Guest --> UC8
+Guest --> UC9
+
+' Registered user functionality
+RegUser --> UC1
+RegUser --> UC2
+RegUser --> UC3
+RegUser --> UC4
+RegUser --> UC5
+RegUser --> UC6
+RegUser --> UC7
+RegUser --> UC10
+RegUser --> UC11
+RegUser --> UC12
+RegUser --> UC13
+RegUser --> UC14
+RegUser --> UC15
+RegUser --> UC16
+RegUser --> UC17
+RegUser --> UC18
+
+' Admin functionality
+Admin --> UC19
+Admin --> UC20
+Admin --> UC21
+
+' Define relationships between use cases
+UC1 <.. UC2 : <<extends>>
+UC1 <.. UC6 : <<extends>>
+UC1 <.. UC7 : <<extends>>
+UC3 <.. UC4 : <<extends>>
+UC3 <.. UC5 : <<extends>>
+UC14 <.. UC1 : <<includes>>
+UC15 ..> UC18 : <<includes>>
+
+@enduml
