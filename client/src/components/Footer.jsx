@@ -10,8 +10,6 @@ import {
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import GitHubIcon from '@mui/icons-material/GitHub';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import TwitterIcon from '@mui/icons-material/Twitter';
 import SearchIcon from '@mui/icons-material/Search';
 
 const Footer = () => {
@@ -42,7 +40,7 @@ const Footer = () => {
               Search and discover open-licensed media content from the largest collections of Creative Commons materials.
             </Typography>
             <Box display="flex" gap={1}>
-            <IconButton 
+              <IconButton 
                 aria-label="GitHub" 
                 size="small" 
                 component="a" 
@@ -71,6 +69,9 @@ const Footer = () => {
               </Link>
               <Link component={RouterLink} to="/history" color="inherit" underline="hover">
                 Search History
+              </Link>
+              <Link component={RouterLink} to="/guide" color="inherit" underline="hover">
+                User Guide
               </Link>
             </Box>
           </Grid>

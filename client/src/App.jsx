@@ -13,6 +13,7 @@ import MediaDetailsPage from './pages/MediaDetailsPage';
 import ProfilePage from './pages/ProfilePage';
 import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import UserGuidePage from './pages/UserGuidePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useEffect } from 'react';
 import axios from 'axios';
@@ -128,6 +129,7 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/terms" element={<TermsAndConditionsPage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/guide" element={<UserGuidePage />} />
                 <Route 
                   path="/history" 
                   element={
